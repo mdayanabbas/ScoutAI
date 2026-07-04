@@ -5,7 +5,6 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
-    Index,
     Integer,
     Numeric,
     String,
@@ -38,12 +37,19 @@ class Job(Base, UUIDMixin, TimestampMixin):
             values_callable=lambda x: [e.value for e in x],
         ),
         default=RoleCategory.OTHER,
+        index=True,
     )
     description: Mapped[str | None] = mapped_column(Text)
     location: Mapped[str | None]
     remote_type: Mapped[RemoteType | None] = mapped_column(
-        Enum(RemoteType, name="remotetype", native_enum=False),
+        Enum(
+            RemoteType,
+            name="remotetype",
+            native_enum=False,
+            values_callable=lambda x: [e.value for e in x],
+        ),
         default=RemoteType.UNKNOWN,
+        index=True,
     )
     experience_min: Mapped[int | None] = mapped_column(Integer)
     experience_max: Mapped[int | None] = mapped_column(Integer)
@@ -53,7 +59,12 @@ class Job(Base, UUIDMixin, TimestampMixin):
     job_url: Mapped[str | None]
     source_platform: Mapped[str | None]
     status: Mapped[JobStatus] = mapped_column(
-        Enum(JobStatus, name="jobstatus", native_enum=False),
+        Enum(
+            JobStatus,
+            name="jobstatus",
+            native_enum=False,
+            values_callable=lambda x: [e.value for e in x],
+        ),
         default=JobStatus.ACTIVE,
     )
     first_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -62,8 +73,4 @@ class Job(Base, UUIDMixin, TimestampMixin):
     company: Mapped["Company"] = relationship(back_populates="jobs")
     agent_runs: Mapped[list["AgentRun"]] = relationship(back_populates="job")
 
-    __table_args__ = (
-        UniqueConstraint("company_id", "job_url"),
-        Index("ix_jobs_role_category", "role_category"),
-        Index("ix_jobs_remote_type", "remote_type"),
-    )
+    __table_args__ = (UniqueConstraint("company_id", "job_url"),)

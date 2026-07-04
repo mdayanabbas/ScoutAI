@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Float, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import Float, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDMixin
@@ -22,7 +22,4 @@ class TechStackItem(Base, UUIDMixin, TimestampMixin):
 
     company: Mapped["Company"] = relationship(back_populates="tech_stack_items")
 
-    __table_args__ = (
-        UniqueConstraint("company_id", "name", "source"),
-        Index("ix_tech_stack_items_company_id", "company_id"),
-    )
+    __table_args__ = (UniqueConstraint("company_id", "name", "source"),)
