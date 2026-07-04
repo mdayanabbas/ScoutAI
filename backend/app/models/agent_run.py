@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDMixin
@@ -31,6 +31,7 @@ class AgentRun(Base, UUIDMixin, TimestampMixin):
             values_callable=lambda x: [e.value for e in x],
         ),
         default=AgentRunStatus.PENDING,
+        index=True,
     )
     model_provider: Mapped[str | None]
     model_name: Mapped[str | None]
@@ -45,10 +46,4 @@ class AgentRun(Base, UUIDMixin, TimestampMixin):
     job: Mapped["Job | None"] = relationship(back_populates="agent_runs")
     steps: Mapped[list["AgentStep"]] = relationship(
         back_populates="agent_run"
-    )
-
-    __table_args__ = (
-        Index("ix_agent_runs_status", "status"),
-        Index("ix_agent_runs_company_id", "company_id"),
-        Index("ix_agent_runs_job_id", "job_id"),
     )
