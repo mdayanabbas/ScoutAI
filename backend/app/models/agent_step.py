@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Index, Integer, JSON, String, Text
+from sqlalchemy import ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDMixin
@@ -23,8 +23,3 @@ class AgentStep(Base, UUIDMixin, TimestampMixin):
     latency_ms: Mapped[int | None] = mapped_column(Integer)
 
     agent_run: Mapped["AgentRun"] = relationship(back_populates="steps")
-
-    __table_args__ = (
-        Index("ix_agent_steps_agent_run_id", "agent_run_id"),
-        Index("ix_agent_steps_step_name", "step_name"),
-    )

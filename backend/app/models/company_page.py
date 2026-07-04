@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDMixin
@@ -26,6 +26,7 @@ class CompanyPage(Base, UUIDMixin, TimestampMixin):
             values_callable=lambda x: [e.value for e in x],
         ),
         default=PageType.UNKNOWN,
+        index=True,
     )
     title: Mapped[str | None] = mapped_column(String)
     raw_text: Mapped[str | None] = mapped_column(Text)
@@ -38,7 +39,4 @@ class CompanyPage(Base, UUIDMixin, TimestampMixin):
 
     company: Mapped["Company"] = relationship(back_populates="company_pages")
 
-    __table_args__ = (
-        UniqueConstraint("company_id", "url"),
-        Index("ix_company_pages_page_type", "page_type"),
-    )
+    __table_args__ = (UniqueConstraint("company_id", "url"),)
