@@ -42,9 +42,13 @@ class AgentRunService:
 
     def create_agent_run(self, data: Any) -> AgentRun:
         values = _data_to_dict(data)
+        values.pop("metadata", None)
         self._validate_refs(values)
         values.setdefault("status", AgentRunStatus.PENDING)
         return self.run_repository.create_agent_run(AgentRun(**values))
+
+    def get_agent_run(self, agent_run_id: str) -> AgentRun:
+        return self._require_agent_run(agent_run_id)
 
     def mark_running(self, agent_run_id: str) -> AgentRun:
         return self.run_repository.mark_running(self._require_agent_run(agent_run_id))
@@ -95,15 +99,69 @@ class AgentRunService:
         )
 
     def list_company_runs(
-        self, company_id: str, offset: int = 0, limit: int = 50
+        self,
+        company_id: str,
+        offset: int = 0,
+        limit: int = 50,
+        agent_name: str | None = None,
+        status: str | None = None,
     ) -> list[AgentRun]:
         if self.company_repository.get_by_id(company_id) is None:
             raise NotFoundError("Company not found")
-        return self.run_repository.list_by_company(company_id, offset=offset, limit=limit)
+        return self.run_repository.list_by_company(
+            company_id,
+            offset=offset,
+            limit=limit,
+            agent_name=agent_name,
+            status=status,
+        )
 
     def list_job_runs(
-        self, job_id: str, offset: int = 0, limit: int = 50
+        self,
+        job_id: str,
+        offset: int = 0,
+        limit: int = 50,
+        agent_name: str | None = None,
+        status: str | None = None,
     ) -> list[AgentRun]:
         if self.job_repository.get_by_id(job_id) is None:
             raise NotFoundError("Job not found")
-        return self.run_repository.list_by_job(job_id, offset=offset, limit=limit)
+        return self.run_repository.list_by_job(
+            job_id,
+            offset=offset,
+            limit=limit,
+            agent_name=agent_name,
+            status=status,
+        )
+
+    def count_runs(
+        self,
+        agent_name: str | None = None,
+        status: str | None = None,
+        company_id: str | None = None,
+        job_id: str | None = None,
+    ) -> int:
+        if company_id is not None and self.company_repository.get_by_id(company_id) is None:
+            raise NotFoundError("Company not found")
+        if job_id is not None and self.job_repository.get_by_id(job_id) is None:
+            raise NotFoundError("Job not found")
+        return self.run_repository.count_runs(
+            agent_name=agent_name,
+            status=status,
+            company_id=company_id,
+            job_id=job_id,
+        )
+
+    def get_step(self, agent_step_id: str) -> AgentStep:
+        step = self.step_repository.get_by_id(agent_step_id)
+        if step is None:
+            raise NotFoundError("Agent step not found")
+        return step
+
+    def update_step(self, agent_step_id: str, data: Any) -> AgentStep:
+        return self.step_repository.update_step(
+            self.get_step(agent_step_id), _data_to_dict(data)
+        )
+
+    def delete_step(self, agent_step_id: str) -> None:
+        self.step_repository.delete_step(self.get_step(agent_step_id))

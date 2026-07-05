@@ -12,7 +12,11 @@ class AgentStepRepository(BaseRepository[AgentStep]):
         super().__init__(session, AgentStep)
 
     def list_by_agent_run(self, agent_run_id: str) -> list[AgentStep]:
-        stmt = select(AgentStep).where(AgentStep.agent_run_id == agent_run_id)
+        stmt = (
+            select(AgentStep)
+            .where(AgentStep.agent_run_id == agent_run_id)
+            .order_by(AgentStep.step_order.asc(), AgentStep.created_at.asc())
+        )
         return list(self.session.scalars(stmt).all())
 
     def create_step(self, agent_step: AgentStep) -> AgentStep:
