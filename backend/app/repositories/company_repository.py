@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import func, or_, select
@@ -63,6 +64,16 @@ class CompanyRepository(BaseRepository[Company]):
         stmt = self._build_list_query(search, source, stage, is_active)
         stmt = select(func.count()).select_from(stmt.subquery())
         return self.session.scalar(stmt) or 0
+
+    def count_created_since(self, since: datetime) -> int:
+        stmt = select(func.count()).select_from(Company).where(
+            Company.created_at >= since
+        )
+        return self.session.scalar(stmt) or 0
+
+    def list_recent(self, limit: int = 20) -> list[Company]:
+        stmt = select(Company).order_by(Company.created_at.desc()).limit(limit)
+        return list(self.session.scalars(stmt).all())
 
     def create_company(self, company: Company) -> Company:
         return self.create(company)

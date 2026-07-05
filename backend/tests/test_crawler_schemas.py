@@ -12,7 +12,7 @@ class CrawlRunObj:
     pages_found = None
     pages_crawled = None
     error_message = None
-    metadata = {"source": "manual"}
+    metadata_json = {"source": "manual"}
     created_at = datetime.now(timezone.utc)
     updated_at = None
 
