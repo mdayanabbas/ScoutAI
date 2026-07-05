@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.utils.enums import CrawlStatus
 
@@ -36,10 +36,29 @@ class CrawlRunRead(BaseModel):
     created_at: datetime
     updated_at: datetime | None = None
 
-    @field_validator("metadata", mode="before")
+    @model_validator(mode="before")
     @classmethod
-    def ignore_non_dict_metadata(cls, value: Any) -> dict[str, Any] | None:
-        return value if isinstance(value, dict) or value is None else None
+    def map_metadata_json(cls, value: Any) -> Any:
+        if isinstance(value, dict):
+            if "metadata" not in value and "metadata_json" in value:
+                value["metadata"] = value["metadata_json"]
+            return value
+
+        if hasattr(value, "metadata_json"):
+            return {
+                "id": value.id,
+                "company_id": value.company_id,
+                "status": value.status,
+                "started_at": value.started_at,
+                "finished_at": value.finished_at,
+                "pages_found": value.pages_found,
+                "pages_crawled": value.pages_crawled,
+                "error_message": value.error_message,
+                "metadata": value.metadata_json,
+                "created_at": value.created_at,
+                "updated_at": value.updated_at,
+            }
+        return value
 
 
 class CrawlRunListItem(CrawlRunRead):

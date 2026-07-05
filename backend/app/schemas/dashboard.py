@@ -9,18 +9,28 @@ class DashboardMetric(BaseModel):
 
 
 class RecentActivityItem(BaseModel):
-    id: str
-    label: str
-    activity_type: str
+    type: str
+    title: str
+    description: str | None = None
+    entity_id: str
     created_at: datetime
 
 
 class DashboardSummary(BaseModel):
-    new_startups_today: int = 0
-    funded_recently: int = 0
-    hiring_now: int = 0
-    remote_friendly: int = 0
-    strong_matches: int = 0
-    founder_hiring_signals: int = 0
     total_companies: int = 0
     total_jobs: int = 0
+    active_jobs: int = 0
+    remote_jobs: int = 0
+    companies_added_today: int = 0
+    jobs_added_today: int = 0
+    recent_crawl_runs: int = 0
+    successful_crawl_runs: int = 0
+    failed_crawl_runs: int = 0
+    recent_agent_runs: int = 0
+    successful_agent_runs: int = 0
+    failed_agent_runs: int = 0
+
+
+class DashboardResponse(BaseModel):
+    summary: DashboardSummary
+    recent_activity: list[RecentActivityItem]

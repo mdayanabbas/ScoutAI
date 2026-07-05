@@ -39,9 +39,7 @@ class AgentRun(Base, UUIDMixin, TimestampMixin):
     output_summary: Mapped[str | None] = mapped_column(Text)
     error_message: Mapped[str | None] = mapped_column(Text)
     latency_ms: Mapped[int | None] = mapped_column(Integer)
-    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(
-        "metadata", JSON, default=None
-    )
+    metadata_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
