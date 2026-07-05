@@ -184,7 +184,9 @@ export default function CompanyDetailPage() {
         <div className="space-y-6">
           <CompanyOverview company={companyQuery.data} />
           <CompanyPages
+            companyId={companyId}
             pages={pagesQuery.data?.items}
+            isLoading={pagesQuery.isLoading}
             error={pagesQuery.error}
           />
           <CompanyJobs jobs={jobsQuery.data?.items} error={jobsQuery.error} />
