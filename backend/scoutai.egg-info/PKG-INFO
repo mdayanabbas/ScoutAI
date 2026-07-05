@@ -1,8 +1,10 @@
 Metadata-Version: 2.4
-Name: scoutai-backend
+Name: scoutai
 Version: 0.1.0
-Summary: AI-powered startup intelligence platform backend
+Summary: AI-powered startup intelligence platform
 Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+License-File: LICENSE
 Requires-Dist: alembic>=1.14.0
 Requires-Dist: fastapi>=0.115.0
 Requires-Dist: httpx>=0.28.0
@@ -15,3 +17,4 @@ Requires-Dist: uvicorn[standard]>=0.34.0
 Provides-Extra: dev
 Requires-Dist: pytest>=8.3.0; extra == "dev"
 Requires-Dist: pytest-asyncio>=0.25.0; extra == "dev"
+Dynamic: license-file

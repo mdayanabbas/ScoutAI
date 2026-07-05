@@ -99,3 +99,13 @@ class AgentStepRead(BaseModel):
     latency_ms: int | None = None
     created_at: datetime
     updated_at: datetime | None = None
+
+
+class AgentRunMarkSuccessRequest(BaseModel):
+    output_summary: str | None = None
+    latency_ms: int | None = Field(default=None, ge=0)
+
+
+class AgentRunMarkFailedRequest(BaseModel):
+    error_message: str = Field(min_length=1)
+    latency_ms: int | None = Field(default=None, ge=0)
