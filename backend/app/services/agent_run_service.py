@@ -18,6 +18,12 @@ def _data_to_dict(data: Any) -> dict[str, Any]:
     return dict(data)
 
 
+def _map_metadata_field(values: dict[str, Any]) -> dict[str, Any]:
+    if "metadata" in values:
+        values["metadata_json"] = values.pop("metadata")
+    return values
+
+
 class AgentRunService:
     def __init__(self, session: Session) -> None:
         self.company_repository = CompanyRepository(session)
@@ -41,8 +47,7 @@ class AgentRunService:
             raise NotFoundError("Job not found")
 
     def create_agent_run(self, data: Any) -> AgentRun:
-        values = _data_to_dict(data)
-        values.pop("metadata", None)
+        values = _map_metadata_field(_data_to_dict(data))
         self._validate_refs(values)
         values.setdefault("status", AgentRunStatus.PENDING)
         return self.run_repository.create_agent_run(AgentRun(**values))

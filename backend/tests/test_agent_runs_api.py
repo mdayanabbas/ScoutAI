@@ -82,6 +82,22 @@ async def test_create_agent_run(agent_runs_api_client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_create_agent_run_persists_metadata(
+    agent_runs_api_client: AsyncClient,
+):
+    response = await agent_runs_api_client.post(
+        "/api/v1/agent-runs",
+        json={
+            "agent_name": "job_understanding_agent",
+            "metadata": {"source": "manual_test"},
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["metadata"] == {"source": "manual_test"}
+
+
+@pytest.mark.asyncio
 async def test_create_agent_run_with_missing_company_returns_404(
     agent_runs_api_client: AsyncClient,
 ):

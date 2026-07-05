@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.utils.enums import AgentRunStatus
 
@@ -58,10 +58,34 @@ class AgentRunRead(BaseModel):
     created_at: datetime
     updated_at: datetime | None = None
 
-    @field_validator("metadata", mode="before")
+    @model_validator(mode="before")
     @classmethod
-    def ignore_non_dict_metadata(cls, value: Any) -> dict[str, Any] | None:
-        return value if isinstance(value, dict) or value is None else None
+    def map_metadata_json(cls, value: Any) -> Any:
+        if isinstance(value, dict):
+            if "metadata" not in value and "metadata_json" in value:
+                value["metadata"] = value["metadata_json"]
+            return value
+
+        if hasattr(value, "metadata_json"):
+            return {
+                "id": value.id,
+                "company_id": value.company_id,
+                "job_id": value.job_id,
+                "agent_name": value.agent_name,
+                "status": value.status,
+                "model_provider": value.model_provider,
+                "model_name": value.model_name,
+                "input_summary": value.input_summary,
+                "output_summary": value.output_summary,
+                "error_message": value.error_message,
+                "latency_ms": value.latency_ms,
+                "started_at": value.started_at,
+                "finished_at": value.finished_at,
+                "metadata": value.metadata_json,
+                "created_at": value.created_at,
+                "updated_at": value.updated_at,
+            }
+        return value
 
 
 class AgentRunListItem(AgentRunRead):
