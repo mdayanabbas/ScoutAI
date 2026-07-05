@@ -1,3 +1,5 @@
+from typing import Any
+
 from sqlalchemy.orm import Session
 
 from app.core.errors import NotFoundError
@@ -22,10 +24,24 @@ class CrawlRunService:
             raise NotFoundError("Crawl run not found")
         return crawl_run
 
-    def create_crawl_run(self, company_id: str) -> CrawlRun:
+    def _map_metadata_field(self, data: Any | None) -> dict[str, Any]:
+        if data is None:
+            return {}
+        if hasattr(data, "model_dump"):
+            values = data.model_dump(exclude_unset=True)
+        else:
+            values = dict(data)
+        if "metadata" in values:
+            values["metadata_json"] = values.pop("metadata")
+        return values
+
+    def create_crawl_run(self, company_id: str, data: Any | None = None) -> CrawlRun:
         self._require_company(company_id)
+        values = self._map_metadata_field(data)
+        values["company_id"] = company_id
+        values.setdefault("status", CrawlStatus.PENDING)
         return self.repository.create_crawl_run(
-            CrawlRun(company_id=company_id, status=CrawlStatus.PENDING)
+            CrawlRun(**values)
         )
 
     def get_crawl_run(self, crawl_run_id: str) -> CrawlRun:

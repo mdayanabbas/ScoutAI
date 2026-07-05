@@ -35,17 +35,24 @@ class CrawlRunRepository(BaseRepository[CrawlRun]):
         offset: int = 0,
         limit: int = 50,
         status: str | None = None,
+        since: datetime | None = None,
     ) -> list[CrawlRun]:
         stmt = select(CrawlRun)
         if status is not None:
             stmt = stmt.where(CrawlRun.status == status)
+        if since is not None:
+            stmt = stmt.where(CrawlRun.created_at >= since)
         stmt = stmt.order_by(CrawlRun.created_at.desc()).offset(offset).limit(limit)
         return list(self.session.scalars(stmt).all())
 
-    def count_recent(self, status: str | None = None) -> int:
+    def count_recent(
+        self, status: str | None = None, since: datetime | None = None
+    ) -> int:
         stmt = select(func.count()).select_from(CrawlRun)
         if status is not None:
             stmt = stmt.where(CrawlRun.status == status)
+        if since is not None:
+            stmt = stmt.where(CrawlRun.created_at >= since)
         return self.session.scalar(stmt) or 0
 
     def create_crawl_run(self, crawl_run: CrawlRun) -> CrawlRun:

@@ -39,6 +39,7 @@ from app.schemas.crawler import (
     CrawlRunUpdate,
 )
 from app.schemas.dashboard import (
+    DashboardResponse,
     DashboardMetric,
     DashboardSummary,
     RecentActivityItem,
@@ -84,6 +85,7 @@ __all__ = [
     "CrawlRunRead",
     "CrawlRunUpdate",
     "DashboardMetric",
+    "DashboardResponse",
     "DashboardSummary",
     "ErrorBody",
     "ErrorResponse",
