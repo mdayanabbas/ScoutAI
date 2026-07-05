@@ -137,6 +137,7 @@ async def test_list_agent_runs_returns_paginated_response(
     assert data["page"] == 1
     assert data["page_size"] == 20
     assert data["items"][0]["id"] == agent_run["id"]
+    assert data["items"][0]["metadata"] == {"source": "manual_test"}
 
 
 @pytest.mark.asyncio
@@ -180,6 +181,7 @@ async def test_get_agent_run(agent_runs_api_client: AsyncClient):
 
     assert response.status_code == 200
     assert response.json()["id"] == agent_run["id"]
+    assert response.json()["metadata"] == {"source": "manual_test"}
 
 
 @pytest.mark.asyncio
@@ -201,6 +203,7 @@ async def test_mark_running_updates_status(agent_runs_api_client: AsyncClient):
     assert response.status_code == 200
     assert response.json()["status"] == "running"
     assert response.json()["started_at"] is not None
+    assert response.json()["metadata"] == {"source": "manual_test"}
 
 
 @pytest.mark.asyncio
@@ -219,6 +222,7 @@ async def test_mark_success_updates_status_and_output(
     assert response.json()["finished_at"] is not None
     assert response.json()["output_summary"] == "Parsed successfully"
     assert response.json()["latency_ms"] == 1200
+    assert response.json()["metadata"] == {"source": "manual_test"}
 
 
 @pytest.mark.asyncio
@@ -237,6 +241,7 @@ async def test_mark_failed_updates_status_and_error(
     assert response.json()["finished_at"] is not None
     assert response.json()["error_message"] == "Model returned invalid JSON"
     assert response.json()["latency_ms"] == 1500
+    assert response.json()["metadata"] == {"source": "manual_test"}
 
 
 @pytest.mark.asyncio

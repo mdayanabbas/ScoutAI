@@ -19,6 +19,7 @@ class AgentRunRepository(BaseRepository[AgentRun]):
         status: str | None = None,
         company_id: str | None = None,
         job_id: str | None = None,
+        since: datetime | None = None,
     ):
         stmt = select(AgentRun)
         if agent_name is not None:
@@ -29,6 +30,8 @@ class AgentRunRepository(BaseRepository[AgentRun]):
             stmt = stmt.where(AgentRun.company_id == company_id)
         if job_id is not None:
             stmt = stmt.where(AgentRun.job_id == job_id)
+        if since is not None:
+            stmt = stmt.where(AgentRun.created_at >= since)
         return stmt
 
     def list_recent(
@@ -37,8 +40,11 @@ class AgentRunRepository(BaseRepository[AgentRun]):
         limit: int = 50,
         agent_name: str | None = None,
         status: str | None = None,
+        since: datetime | None = None,
     ) -> list[AgentRun]:
-        stmt = self._build_list_query(agent_name=agent_name, status=status)
+        stmt = self._build_list_query(
+            agent_name=agent_name, status=status, since=since
+        )
         stmt = stmt.order_by(AgentRun.created_at.desc()).offset(offset).limit(limit)
         return list(self.session.scalars(stmt).all())
 
@@ -76,8 +82,9 @@ class AgentRunRepository(BaseRepository[AgentRun]):
         status: str | None = None,
         company_id: str | None = None,
         job_id: str | None = None,
+        since: datetime | None = None,
     ) -> int:
-        stmt = self._build_list_query(agent_name, status, company_id, job_id)
+        stmt = self._build_list_query(agent_name, status, company_id, job_id, since)
         stmt = select(func.count()).select_from(stmt.subquery())
         return self.session.scalar(stmt) or 0
 

@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import func, or_, select
@@ -5,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models.job import Job
 from app.repositories.base import BaseRepository
-from app.utils.enums import JobStatus
+from app.utils.enums import JobStatus, RemoteType
 
 
 class JobRepository(BaseRepository[Job]):
@@ -86,6 +87,25 @@ class JobRepository(BaseRepository[Job]):
         )
         stmt = select(func.count()).select_from(stmt.subquery())
         return self.session.scalar(stmt) or 0
+
+    def count_created_since(self, since: datetime) -> int:
+        stmt = select(func.count()).select_from(Job).where(Job.created_at >= since)
+        return self.session.scalar(stmt) or 0
+
+    def count_remote_jobs(self) -> int:
+        remote_types = (
+            RemoteType.REMOTE_COUNTRY,
+            RemoteType.REMOTE_REGION,
+            RemoteType.REMOTE_WORLDWIDE,
+        )
+        stmt = select(func.count()).select_from(Job).where(
+            Job.remote_type.in_(remote_types)
+        )
+        return self.session.scalar(stmt) or 0
+
+    def list_recent(self, limit: int = 20) -> list[Job]:
+        stmt = select(Job).order_by(Job.created_at.desc()).limit(limit)
+        return list(self.session.scalars(stmt).all())
 
     def create_job(self, job: Job) -> Job:
         return self.create(job)

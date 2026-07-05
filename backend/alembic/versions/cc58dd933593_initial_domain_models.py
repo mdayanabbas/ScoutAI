@@ -309,6 +309,7 @@ def upgrade() -> None:
         sa.Column("pages_found", sa.Integer(), nullable=True),
         sa.Column("pages_crawled", sa.Integer(), nullable=True),
         sa.Column("error_message", sa.Text(), nullable=True),
+        sa.Column("metadata_json", sa.JSON(), nullable=True),
         sa.Column("id", sa.String(), nullable=False),
         sa.Column(
             "created_at",
@@ -353,6 +354,7 @@ def upgrade() -> None:
         sa.Column("output_summary", sa.Text(), nullable=True),
         sa.Column("error_message", sa.Text(), nullable=True),
         sa.Column("latency_ms", sa.Integer(), nullable=True),
+        sa.Column("metadata_json", sa.JSON(), nullable=True),
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("id", sa.String(), nullable=False),
