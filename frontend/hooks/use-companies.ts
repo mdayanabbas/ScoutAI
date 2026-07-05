@@ -56,8 +56,9 @@ export function useUpdateCompany() {
     mutationFn: ({ id, data }: { id: string; data: CompanyUpdate }) =>
       updateCompany(id, data),
     onSuccess: (company) => {
-      queryClient.invalidateQueries({ queryKey: companyKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: companyKeys.all });
       queryClient.invalidateQueries({ queryKey: companyKeys.detail(company.id) });
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
     },
   });
 }
@@ -67,8 +68,10 @@ export function useDeleteCompany() {
 
   return useMutation({
     mutationFn: (id: string) => deleteCompany(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: companyKeys.lists() });
+    onSuccess: (_response, id) => {
+      queryClient.invalidateQueries({ queryKey: companyKeys.all });
+      queryClient.invalidateQueries({ queryKey: companyKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
     },
   });
 }
