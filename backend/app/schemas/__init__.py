@@ -1,6 +1,8 @@
 from app.schemas.agent import (
     AgentRunCreate,
     AgentRunListItem,
+    AgentRunMarkFailedRequest,
+    AgentRunMarkSuccessRequest,
     AgentRunRead,
     AgentRunUpdate,
     AgentStepCreate,
@@ -31,6 +33,8 @@ from app.schemas.company_page import (
 from app.schemas.crawler import (
     CrawlRunCreate,
     CrawlRunListItem,
+    CrawlRunMarkFailedRequest,
+    CrawlRunMarkSuccessRequest,
     CrawlRunRead,
     CrawlRunUpdate,
 )
@@ -56,6 +60,8 @@ from app.schemas.user_profile import (
 __all__ = [
     "AgentRunCreate",
     "AgentRunListItem",
+    "AgentRunMarkFailedRequest",
+    "AgentRunMarkSuccessRequest",
     "AgentRunRead",
     "AgentRunUpdate",
     "AgentStepCreate",
@@ -73,6 +79,8 @@ __all__ = [
     "CompanyUpdate",
     "CrawlRunCreate",
     "CrawlRunListItem",
+    "CrawlRunMarkFailedRequest",
+    "CrawlRunMarkSuccessRequest",
     "CrawlRunRead",
     "CrawlRunUpdate",
     "DashboardMetric",
