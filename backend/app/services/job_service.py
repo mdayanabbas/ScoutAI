@@ -3,7 +3,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.core.errors import NotFoundError
+from app.core.errors import ConflictError, NotFoundError
 from app.models.job import Job
 from app.repositories.company_repository import CompanyRepository
 from app.repositories.job_repository import JobRepository
@@ -72,6 +72,27 @@ class JobService:
             search=search,
         )
 
+    def list_company_jobs(
+        self,
+        company_id: str,
+        offset: int = 0,
+        limit: int = 50,
+        role_category: str | None = None,
+        remote_type: str | None = None,
+        status: str | None = None,
+        search: str | None = None,
+    ) -> list[Job]:
+        self._require_company(company_id)
+        return self.list_jobs(
+            offset=offset,
+            limit=limit,
+            company_id=company_id,
+            role_category=role_category,
+            remote_type=remote_type,
+            status=status,
+            search=search,
+        )
+
     def list_active_jobs(
         self, company_id: str | None = None, offset: int = 0, limit: int = 50
     ) -> list[Job]:
@@ -86,6 +107,11 @@ class JobService:
             values["normalized_title"] = normalize_title(title)
         if job_url := values.get("job_url"):
             values["job_url"] = normalize_url(job_url)
+            existing = self.job_repository.get_by_company_and_url(
+                job.company_id, values["job_url"]
+            )
+            if existing is not None and existing.id != job.id:
+                raise ConflictError("Job already exists")
         return self.job_repository.update_job(job, values)
 
     def delete_job(self, job_id: str) -> None:
@@ -100,6 +126,23 @@ class JobService:
         search: str | None = None,
     ) -> int:
         return self.job_repository.count_jobs(
+            company_id=company_id,
+            role_category=role_category,
+            remote_type=remote_type,
+            status=status,
+            search=search,
+        )
+
+    def count_company_jobs(
+        self,
+        company_id: str,
+        role_category: str | None = None,
+        remote_type: str | None = None,
+        status: str | None = None,
+        search: str | None = None,
+    ) -> int:
+        self._require_company(company_id)
+        return self.count_jobs(
             company_id=company_id,
             role_category=role_category,
             remote_type=remote_type,
