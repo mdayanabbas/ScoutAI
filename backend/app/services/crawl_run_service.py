@@ -28,6 +28,9 @@ class CrawlRunService:
             CrawlRun(company_id=company_id, status=CrawlStatus.PENDING)
         )
 
+    def get_crawl_run(self, crawl_run_id: str) -> CrawlRun:
+        return self._require_crawl_run(crawl_run_id)
+
     def mark_running(self, crawl_run_id: str) -> CrawlRun:
         return self.repository.mark_running(self._require_crawl_run(crawl_run_id))
 
@@ -54,7 +57,14 @@ class CrawlRunService:
         self._require_company(company_id)
         return self.repository.list_by_company(company_id, offset=offset, limit=limit)
 
+    def count_company_runs(self, company_id: str) -> int:
+        self._require_company(company_id)
+        return self.repository.count_by_company(company_id)
+
     def list_recent_runs(
         self, offset: int = 0, limit: int = 50, status: str | None = None
     ) -> list[CrawlRun]:
         return self.repository.list_recent(offset=offset, limit=limit, status=status)
+
+    def count_recent_runs(self, status: str | None = None) -> int:
+        return self.repository.count_recent(status=status)

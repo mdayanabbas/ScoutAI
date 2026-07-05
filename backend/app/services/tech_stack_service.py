@@ -2,7 +2,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.core.errors import NotFoundError
+from app.core.errors import ConflictError, NotFoundError
 from app.models.tech_stack_item import TechStackItem
 from app.repositories.company_repository import CompanyRepository
 from app.repositories.tech_stack_repository import TechStackRepository
@@ -40,7 +40,26 @@ class TechStackService:
 
     def list_company_tech_stack(self, company_id: str) -> list[TechStackItem]:
         self._require_company(company_id)
-        return self.repository.list_by_company(company_id)
+        return sorted(self.repository.list_by_company(company_id), key=lambda item: item.name)
+
+    def update_item(self, item_id: str, data: Any) -> TechStackItem:
+        item = self.repository.get_by_id(item_id)
+        if item is None:
+            raise NotFoundError("Tech stack item not found")
+
+        values = _data_to_dict(data)
+        if name := values.get("name"):
+            values["name"] = normalize_text(name)
+
+        lookup_name = values.get("name", item.name)
+        lookup_source = values.get("source", item.source)
+        existing = self.repository.get_by_company_and_name(
+            item.company_id, lookup_name, source=lookup_source
+        )
+        if existing is not None and existing.id != item.id:
+            raise ConflictError("Tech stack item already exists")
+
+        return self.repository.update_item(item, values)
 
     def delete_item(self, item_id: str) -> None:
         item = self.repository.get_by_id(item_id)

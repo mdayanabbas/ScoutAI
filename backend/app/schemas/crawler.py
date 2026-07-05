@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.utils.enums import CrawlStatus
 
@@ -44,3 +44,12 @@ class CrawlRunRead(BaseModel):
 
 class CrawlRunListItem(CrawlRunRead):
     pass
+
+
+class CrawlRunMarkSuccessRequest(BaseModel):
+    pages_found: int | None = Field(default=None, ge=0)
+    pages_crawled: int | None = Field(default=None, ge=0)
+
+
+class CrawlRunMarkFailedRequest(BaseModel):
+    error_message: str = Field(min_length=1)

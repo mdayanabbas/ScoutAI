@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.crawl_run import CrawlRun
@@ -24,6 +24,12 @@ class CrawlRunRepository(BaseRepository[CrawlRun]):
         )
         return list(self.session.scalars(stmt).all())
 
+    def count_by_company(self, company_id: str) -> int:
+        stmt = select(func.count()).select_from(CrawlRun).where(
+            CrawlRun.company_id == company_id
+        )
+        return self.session.scalar(stmt) or 0
+
     def list_recent(
         self,
         offset: int = 0,
@@ -35,6 +41,12 @@ class CrawlRunRepository(BaseRepository[CrawlRun]):
             stmt = stmt.where(CrawlRun.status == status)
         stmt = stmt.order_by(CrawlRun.created_at.desc()).offset(offset).limit(limit)
         return list(self.session.scalars(stmt).all())
+
+    def count_recent(self, status: str | None = None) -> int:
+        stmt = select(func.count()).select_from(CrawlRun)
+        if status is not None:
+            stmt = stmt.where(CrawlRun.status == status)
+        return self.session.scalar(stmt) or 0
 
     def create_crawl_run(self, crawl_run: CrawlRun) -> CrawlRun:
         return self.create(crawl_run)

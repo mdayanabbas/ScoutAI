@@ -27,7 +27,7 @@ class AgentRunObj:
     latency_ms = None
     started_at = None
     finished_at = None
-    metadata = {"trace": "1"}
+    metadata_json = {"trace": "1"}
     created_at = datetime.now(timezone.utc)
     updated_at = None
 
