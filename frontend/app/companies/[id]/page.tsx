@@ -196,7 +196,9 @@ export default function CompanyDetailPage() {
             error={jobsQuery.error}
           />
           <CompanyTechStack
+            companyId={companyId}
             items={techStackQuery.data}
+            isLoading={techStackQuery.isLoading}
             error={techStackQuery.error}
           />
           <CompanyCrawlRuns
