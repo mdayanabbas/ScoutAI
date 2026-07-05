@@ -2,7 +2,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.core.errors import NotFoundError
+from app.core.errors import ConflictError, NotFoundError
 from app.models.company_page import CompanyPage
 from app.repositories.company_page_repository import CompanyPageRepository
 from app.repositories.company_repository import CompanyRepository
@@ -43,6 +43,19 @@ class CompanyPageService:
         if page is None:
             raise NotFoundError("Company page not found")
         return page
+
+    def update_page(self, page_id: str, data: Any) -> CompanyPage:
+        page = self.get_page(page_id)
+        values = _data_to_dict(data)
+        values.pop("company_id", None)
+        if url := values.get("url"):
+            values["url"] = normalize_url(url)
+            existing = self.page_repository.get_by_company_and_url(
+                page.company_id, values["url"]
+            )
+            if existing is not None and existing.id != page.id:
+                raise ConflictError("Company page already exists")
+        return self.page_repository.update_page(page, values)
 
     def list_company_pages(
         self,
