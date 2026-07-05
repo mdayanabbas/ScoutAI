@@ -16,6 +16,7 @@ export type CompanyPage = {
   url: string;
   page_type: PageType;
   title: string | null;
+  raw_text?: string | null;
   html_hash: string | null;
   status_code: number | null;
   content_length: number | null;
@@ -29,3 +30,15 @@ export type ListCompanyPagesParams = {
   page_size?: number;
   page_type?: PageType;
 };
+
+export type CompanyPageCreateInput = {
+  url: string;
+  page_type?: PageType;
+  title?: string | null;
+  raw_text?: string | null;
+  html_hash?: string | null;
+  status_code?: number | null;
+  content_length?: number | null;
+};
+
+export type CompanyPageUpdateInput = Partial<CompanyPageCreateInput>;

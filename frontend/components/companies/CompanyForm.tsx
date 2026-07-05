@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, ReactNode, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 
 import { ApiError } from "@/lib/api";
 import type {
@@ -61,6 +61,8 @@ const initialValues: CompanyFormValues = {
 type FieldErrors = Partial<Record<keyof CompanyFormValues, string>>;
 
 type CompanyFormProps = {
+  initialValues?: Partial<CompanyCreateInput>;
+  mode?: "create" | "edit";
   isSubmitting?: boolean;
   submitError?: unknown;
   onSubmit: (data: CompanyCreateInput) => Promise<void> | void;
@@ -95,18 +97,41 @@ function getBackendErrorMessage(error: unknown) {
 }
 
 export function CompanyForm({
+  initialValues: formInitialValues,
+  mode = "create",
   isSubmitting = false,
   submitError,
   onSubmit,
   onCancel,
 }: CompanyFormProps) {
-  const [values, setValues] = useState<CompanyFormValues>(initialValues);
+  const resolvedInitialValues = useMemo(
+    () => toFormValues(formInitialValues),
+    [
+      formInitialValues?.name,
+      formInitialValues?.website_url,
+      formInitialValues?.description,
+      formInitialValues?.country,
+      formInitialValues?.city,
+      formInitialValues?.stage,
+      formInitialValues?.source,
+      formInitialValues?.employee_count_min,
+      formInitialValues?.employee_count_max,
+      formInitialValues?.founded_year,
+      formInitialValues?.is_active,
+    ],
+  );
+  const [values, setValues] = useState<CompanyFormValues>(resolvedInitialValues);
   const [errors, setErrors] = useState<FieldErrors>({});
 
   const backendError = useMemo(
     () => getBackendErrorMessage(submitError),
     [submitError],
   );
+
+  useEffect(() => {
+    setValues(resolvedInitialValues);
+    setErrors({});
+  }, [resolvedInitialValues]);
 
   function updateField<K extends keyof CompanyFormValues>(
     field: K,
@@ -174,7 +199,7 @@ export function CompanyForm({
       founded_year: optionalNumber(values.founded_year),
       is_active: values.is_active,
     });
-    setValues(initialValues);
+    setValues(mode === "create" ? initialValues : resolvedInitialValues);
     setErrors({});
   }
 
@@ -330,11 +355,44 @@ export function CompanyForm({
           disabled={isSubmitting}
           className="rounded bg-[#172033] px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isSubmitting ? "Creating..." : "Create Company"}
+          {isSubmitting
+            ? mode === "edit"
+              ? "Saving..."
+              : "Creating..."
+            : mode === "edit"
+              ? "Save Changes"
+              : "Create Company"}
         </button>
       </div>
     </form>
   );
+}
+
+function toFormValues(values?: Partial<CompanyCreateInput>): CompanyFormValues {
+  return {
+    name: values?.name ?? initialValues.name,
+    website_url: values?.website_url ?? initialValues.website_url,
+    description: values?.description ?? initialValues.description,
+    country: values?.country ?? initialValues.country,
+    city: values?.city ?? initialValues.city,
+    stage: values?.stage ?? initialValues.stage,
+    source: values?.source ?? initialValues.source,
+    employee_count_min:
+      values?.employee_count_min === null ||
+      values?.employee_count_min === undefined
+        ? initialValues.employee_count_min
+        : String(values.employee_count_min),
+    employee_count_max:
+      values?.employee_count_max === null ||
+      values?.employee_count_max === undefined
+        ? initialValues.employee_count_max
+        : String(values.employee_count_max),
+    founded_year:
+      values?.founded_year === null || values?.founded_year === undefined
+        ? initialValues.founded_year
+        : String(values.founded_year),
+    is_active: values?.is_active ?? initialValues.is_active,
+  };
 }
 
 function Field({
