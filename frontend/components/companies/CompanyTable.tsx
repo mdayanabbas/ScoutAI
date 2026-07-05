@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import type { Company } from "@/types/company";
 
 function formatDate(value: string) {
@@ -54,7 +56,12 @@ export function CompanyTable({ companies }: { companies: Company[] }) {
             {companies.map((company) => (
               <tr key={company.id} className="hover:bg-[#f8fafc]">
                 <td className="whitespace-nowrap px-4 py-4 font-medium text-[#171923]">
-                  {company.name}
+                  <Link
+                    href={`/companies/${company.id}`}
+                    className="text-[#175cd3] hover:underline"
+                  >
+                    {company.name}
+                  </Link>
                 </td>
                 <td className="whitespace-nowrap px-4 py-4 text-[#475467]">
                   {company.normalized_domain}
