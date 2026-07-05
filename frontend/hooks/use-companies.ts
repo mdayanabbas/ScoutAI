@@ -7,6 +7,7 @@ import {
   listCompanies,
   updateCompany,
 } from "@/lib/companies-api";
+import { dashboardKeys } from "@/hooks/use-dashboard";
 import type {
   CompanyCreate,
   CompanyUpdate,
@@ -43,6 +44,7 @@ export function useCreateCompany() {
     mutationFn: (data: CompanyCreate) => createCompany(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: companyKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
     },
   });
 }
