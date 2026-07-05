@@ -4,17 +4,18 @@ export type CompanyStage =
   | "seed"
   | "series_a"
   | "series_b"
-  | "series_c_plus"
-  | "public"
-  | string;
+  | "growth"
+  | "public";
 
 export type CompanySource =
   | "manual"
-  | "wellfound"
   | "yc"
-  | "linkedin"
-  | "other"
-  | string;
+  | "product_hunt"
+  | "hacker_news"
+  | "wellfound"
+  | "company_website"
+  | "rss"
+  | "other";
 
 export type Company = {
   id: string;
@@ -34,7 +35,7 @@ export type Company = {
   updated_at: string | null;
 };
 
-export type CompanyCreate = {
+export type CompanyCreateInput = {
   name: string;
   website_url: string;
   description?: string | null;
@@ -48,7 +49,10 @@ export type CompanyCreate = {
   is_active?: boolean;
 };
 
-export type CompanyUpdate = Partial<CompanyCreate>;
+export type CompanyUpdateInput = Partial<CompanyCreateInput>;
+
+export type CompanyCreate = CompanyCreateInput;
+export type CompanyUpdate = CompanyUpdateInput;
 
 export type ListCompaniesParams = {
   page?: number;
