@@ -189,7 +189,12 @@ export default function CompanyDetailPage() {
             isLoading={pagesQuery.isLoading}
             error={pagesQuery.error}
           />
-          <CompanyJobs jobs={jobsQuery.data?.items} error={jobsQuery.error} />
+          <CompanyJobs
+            companyId={companyId}
+            jobs={jobsQuery.data?.items}
+            isLoading={jobsQuery.isLoading}
+            error={jobsQuery.error}
+          />
           <CompanyTechStack
             items={techStackQuery.data}
             error={techStackQuery.error}
