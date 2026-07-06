@@ -14,6 +14,21 @@ export type CrawlRun = {
   updated_at: string | null;
 };
 
+export type CrawlRunMarkSuccessInput = {
+  pages_found?: number | null;
+  pages_crawled?: number | null;
+};
+
+export type CrawlRunMarkFailedInput = {
+  error_message: string;
+};
+
+export type ListCrawlRunsParams = {
+  page?: number;
+  page_size?: number;
+  status?: CrawlStatus;
+};
+
 export type ListCompanyCrawlRunsParams = {
   page?: number;
   page_size?: number;

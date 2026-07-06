@@ -19,6 +19,50 @@ export type AgentRun = {
   updated_at: string | null;
 };
 
+export type AgentStep = {
+  id: string;
+  agent_run_id: string;
+  step_name: string;
+  step_order: number | null;
+  input_payload: Record<string, unknown> | null;
+  output_payload: Record<string, unknown> | null;
+  error_message: string | null;
+  latency_ms: number | null;
+  created_at: string;
+  updated_at: string | null;
+};
+
+export type AgentRunCreateInput = {
+  company_id?: string | null;
+  job_id?: string | null;
+  agent_name: string;
+  model_provider?: string | null;
+  model_name?: string | null;
+  input_summary?: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+export type AgentRunMarkSuccessInput = {
+  output_summary?: string | null;
+  latency_ms?: number | null;
+};
+
+export type AgentRunMarkFailedInput = {
+  error_message: string;
+  latency_ms?: number | null;
+};
+
+export type AgentStepCreateInput = {
+  step_name: string;
+  step_order: number;
+  input_payload?: Record<string, unknown> | null;
+  output_payload?: Record<string, unknown> | null;
+  error_message?: string | null;
+  latency_ms?: number | null;
+};
+
+export type AgentStepUpdateInput = Partial<AgentStepCreateInput>;
+
 export type ListAgentRunsParams = {
   page?: number;
   page_size?: number;
