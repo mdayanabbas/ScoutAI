@@ -202,11 +202,15 @@ export default function CompanyDetailPage() {
             error={techStackQuery.error}
           />
           <CompanyCrawlRuns
+            companyId={companyId}
             runs={crawlRunsQuery.data?.items}
+            isLoading={crawlRunsQuery.isLoading}
             error={crawlRunsQuery.error}
           />
           <CompanyAgentRuns
+            companyId={companyId}
             runs={agentRunsQuery.data?.items}
+            isLoading={agentRunsQuery.isLoading}
             error={agentRunsQuery.error}
           />
         </div>
