@@ -208,7 +208,9 @@ export default function CompanyDetailPage() {
             error={crawlRunsQuery.error}
           />
           <CompanyAgentRuns
+            companyId={companyId}
             runs={agentRunsQuery.data?.items}
+            isLoading={agentRunsQuery.isLoading}
             error={agentRunsQuery.error}
           />
         </div>
