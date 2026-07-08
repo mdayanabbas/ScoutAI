@@ -1,6 +1,10 @@
 import re
 from dataclasses import dataclass
 
+from app.discovery.identity import (
+    candidate_has_job_language,
+    has_reliable_company_identity,
+)
 from app.schemas.discovery import NormalizedStartupCandidate, RawStartupCandidate
 
 DOMAIN_RE = re.compile(
@@ -13,18 +17,6 @@ DOMAIN_RE = re.compile(
 class CandidateValidationResult:
     valid: bool
     reason: str | None = None
-
-
-def _looks_like_job_post(candidate: RawStartupCandidate) -> bool:
-    haystack = " ".join(
-        value or ""
-        for value in [candidate.name, candidate.description, candidate.website_url]
-    ).lower()
-    job_markers = [" job ", " jobs ", " hiring ", " opening ", " role ", " careers"]
-    company_markers = [" startup", " company", " platform", " builds", " building"]
-    return any(marker in f" {haystack} " for marker in job_markers) and not any(
-        marker in haystack for marker in company_markers
-    )
 
 
 def validate_candidate(
@@ -41,6 +33,8 @@ def validate_candidate(
         normalized_candidate.normalized_domain
     ):
         return CandidateValidationResult(False, "invalid_normalized_domain")
-    if _looks_like_job_post(raw_candidate):
+    if candidate_has_job_language(raw_candidate) and not has_reliable_company_identity(
+        raw_candidate, normalized_candidate
+    ):
         return CandidateValidationResult(False, "job_post_without_company_identity")
     return CandidateValidationResult(True)

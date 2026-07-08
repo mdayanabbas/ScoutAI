@@ -40,6 +40,7 @@ class DiscoveryRun(Base, UUIDMixin, TimestampMixin):
     candidates_normalized: Mapped[int] = mapped_column(Integer, default=0)
     companies_created: Mapped[int] = mapped_column(Integer, default=0)
     companies_matched: Mapped[int] = mapped_column(Integer, default=0)
+    candidates_deferred: Mapped[int] = mapped_column(Integer, default=0)
     candidates_rejected: Mapped[int] = mapped_column(Integer, default=0)
     candidates_failed: Mapped[int] = mapped_column(Integer, default=0)
     error_message: Mapped[str | None] = mapped_column(Text)

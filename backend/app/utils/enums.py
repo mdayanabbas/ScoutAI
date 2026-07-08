@@ -55,6 +55,7 @@ class DiscoveryCandidateStatus(StrEnum):
 class DiscoveryDecision(StrEnum):
     CREATED_COMPANY = "created_company"
     MATCHED_EXISTING_COMPANY = "matched_existing_company"
+    DEFERRED = "deferred"
     REJECTED = "rejected"
     FAILED = "failed"
 

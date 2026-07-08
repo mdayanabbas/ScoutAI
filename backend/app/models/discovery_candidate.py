@@ -67,6 +67,7 @@ class DiscoveryCandidate(Base, UUIDMixin, TimestampMixin):
         )
     )
     rejection_reason: Mapped[str | None]
+    deferred_reason: Mapped[str | None]
     error_message: Mapped[str | None] = mapped_column(Text)
     matched_company_id: Mapped[str | None] = mapped_column(
         ForeignKey("companies.id", ondelete="SET NULL")

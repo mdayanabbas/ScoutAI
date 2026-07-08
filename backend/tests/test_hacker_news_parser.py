@@ -31,6 +31,12 @@ def test_cleans_html_text():
     assert clean_hacker_news_html("<p>Hello&nbsp;world</p><script>x()</script>") == "Hello world"
 
 
+def test_cleans_unicode_space_characters():
+    assert clean_hacker_news_html("Hello\u00a0world") == "Hello world"
+    assert clean_hacker_news_html("Hello\u2007world") == "Hello world"
+    assert clean_hacker_news_html("Hello\u202fworld") == "Hello world"
+
+
 def test_creates_hacker_news_evidence_with_utc_timestamp():
     item = HackerNewsItem(
         id=42,
@@ -61,3 +67,24 @@ def test_ignores_hacker_news_url_as_company_website():
     )
 
     assert extract_candidate_website(item) is None
+
+
+def test_github_url_does_not_become_company_website():
+    item = HackerNewsItem(
+        id=5,
+        type="story",
+        title="Show HN: Rowboat - agents",
+        url="https://github.com/rowboatlabs/rowboat",
+    )
+
+    assert extract_candidate_website(item) is None
+
+
+def test_stealth_job_without_reliable_identity_is_rejected():
+    item = HackerNewsItem(
+        id=6,
+        type="job",
+        title="Stealth robotics startup is hiring",
+    )
+
+    assert extract_candidate_name(item) is None

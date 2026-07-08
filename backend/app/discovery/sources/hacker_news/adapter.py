@@ -7,9 +7,9 @@ from app.discovery.sources.hacker_news.parser import (
     build_candidate_description,
     build_hacker_news_evidence,
     extract_candidate_name,
-    extract_candidate_website,
     is_candidate_item,
 )
+from app.discovery.url_classifier import classify_candidate_url
 from app.discovery.sources.hacker_news.schemas import (
     HackerNewsDiscoveryRequest,
     HackerNewsItem,
@@ -116,32 +116,42 @@ class HackerNewsDiscoveryAdapter(StartupSourceAdapter):
     def _to_candidate(
         self, item: HackerNewsItem, feed: str | None
     ) -> RawStartupCandidate | None:
-        name = extract_candidate_name(item)
+        classification = classify_candidate_url(item.url)
+        name = extract_candidate_name(item) or self._name_from_external_slug(
+            classification.external_company_slug
+        )
         if not name:
             return None
         evidence = build_hacker_news_evidence(item, feed)
+        raw_payload = {
+            "id": item.id,
+            "type": item.type,
+            "by": item.by,
+            "time": item.time,
+            "title": item.title,
+            "url": item.url,
+            "text": item.text,
+            "score": item.score,
+            "descendants": item.descendants,
+            "feed": feed,
+            "url_classification": classification.model_dump(),
+        }
         return RawStartupCandidate(
             source_identifier=f"hn:{item.id}",
             name=name,
-            website_url=extract_candidate_website(item),
+            website_url=classification.first_party_url,
             description=build_candidate_description(item),
             country=None,
             evidence=[evidence],
-            raw_payload={
-                "id": item.id,
-                "type": item.type,
-                "by": item.by,
-                "time": item.time,
-                "title": item.title,
-                "url": item.url,
-                "text": item.text,
-                "score": item.score,
-                "descendants": item.descendants,
-                "feed": feed,
-            },
+            raw_payload=raw_payload,
         )
 
     def _is_within_lookback(self, item: HackerNewsItem, cutoff: datetime) -> bool:
         if item.time is None:
             return True
         return datetime.fromtimestamp(item.time, timezone.utc) >= cutoff
+
+    def _name_from_external_slug(self, slug: str | None) -> str | None:
+        if not slug:
+            return None
+        return " ".join(part.capitalize() for part in slug.replace("_", "-").split("-") if part)
