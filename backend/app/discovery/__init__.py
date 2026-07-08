@@ -1,0 +1,1 @@
+"""Startup discovery ingestion foundation."""

@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,6 +21,18 @@ class Settings(BaseSettings):
     )
     REDIS_URL: str = "redis://localhost:6379/0"
     LOG_LEVEL: str = "INFO"
+    HACKER_NEWS_API_BASE_URL: str = "https://hacker-news.firebaseio.com/v0"
+    HACKER_NEWS_REQUEST_TIMEOUT_SECONDS: int = Field(default=10, gt=0)
+    HACKER_NEWS_MAX_CONCURRENCY: int = Field(default=8, gt=0)
+    HACKER_NEWS_DEFAULT_LIMIT: int = Field(default=50, gt=0)
+    HACKER_NEWS_MAX_LIMIT: int = Field(default=200, gt=0)
+    HACKER_NEWS_DEFAULT_LOOKBACK_DAYS: int = Field(default=30, ge=1, le=365)
+
+    @model_validator(mode="after")
+    def validate_hacker_news_limits(self):
+        if self.HACKER_NEWS_DEFAULT_LIMIT > self.HACKER_NEWS_MAX_LIMIT:
+            self.HACKER_NEWS_DEFAULT_LIMIT = self.HACKER_NEWS_MAX_LIMIT
+        return self
 
 
 @lru_cache
