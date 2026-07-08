@@ -34,4 +34,5 @@ def normalize_candidate(candidate: RawStartupCandidate) -> NormalizedStartupCand
         description=_clean_text(candidate.description),
         country=_clean_text(candidate.country),
         evidence=candidate.evidence,
+        raw_payload=candidate.raw_payload,
     )

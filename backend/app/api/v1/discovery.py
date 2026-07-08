@@ -51,7 +51,7 @@ async def run_hacker_news_discovery(
     if (
         result.run.status == DiscoveryRunStatus.FAILED
         and result.run.candidates_found == 0
-        and result.run.error_message != "No candidates were successfully ingested"
+        and result.run.error_message != "No candidates were successfully processed"
     ):
         raise AppError(
             code="HACKER_NEWS_DISCOVERY_ERROR",

@@ -38,6 +38,7 @@ class NormalizedStartupCandidate(BaseModel):
     description: str | None = None
     country: str | None = None
     evidence: list[DiscoveryEvidenceInput] = Field(default_factory=list)
+    raw_payload: dict[str, Any] | None = None
 
 
 class ManualDiscoveryRequest(BaseModel):
@@ -92,6 +93,7 @@ class DiscoveryRunRead(BaseModel):
     candidates_normalized: int
     companies_created: int
     companies_matched: int
+    candidates_deferred: int
     candidates_rejected: int
     candidates_failed: int
     error_message: str | None = None
@@ -117,6 +119,7 @@ class DiscoveryRunRead(BaseModel):
                 "candidates_normalized": value.candidates_normalized,
                 "companies_created": value.companies_created,
                 "companies_matched": value.companies_matched,
+                "candidates_deferred": value.candidates_deferred,
                 "candidates_rejected": value.candidates_rejected,
                 "candidates_failed": value.candidates_failed,
                 "error_message": value.error_message,
@@ -146,6 +149,7 @@ class DiscoveryCandidateRead(BaseModel):
     status: DiscoveryCandidateStatus
     decision: DiscoveryDecision | None = None
     rejection_reason: str | None = None
+    deferred_reason: str | None = None
     error_message: str | None = None
     matched_company_id: str | None = None
     raw_payload: dict[str, Any] | None = None

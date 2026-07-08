@@ -8,12 +8,17 @@ from sqlalchemy.orm import Session
 from app.core.errors import NotFoundError
 from app.discovery.adapters.base import StartupSourceAdapter
 from app.discovery.adapters.manual import ManualDiscoveryAdapter
+from app.discovery.identity import (
+    get_candidate_url_classification,
+    get_hacker_news_feed,
+)
 from app.discovery.normalizer import CandidateNormalizationError, normalize_candidate
 from app.discovery.sources.hacker_news.adapter import HackerNewsDiscoveryAdapter
 from app.discovery.sources.hacker_news.schemas import (
     HackerNewsDiscoveryRequest,
     HackerNewsDiscoveryResponse,
 )
+from app.discovery.url_classifier import CandidateUrlType, build_candidate_identity
 from app.discovery.validator import validate_candidate
 from app.models.discovery_candidate import DiscoveryCandidate
 from app.models.discovery_evidence import DiscoveryEvidence
@@ -46,6 +51,7 @@ class DiscoveryCounters:
     candidates_normalized: int = 0
     companies_created: int = 0
     companies_matched: int = 0
+    candidates_deferred: int = 0
     candidates_rejected: int = 0
     candidates_failed: int = 0
 
@@ -55,6 +61,7 @@ class DiscoveryCounters:
             "candidates_normalized": self.candidates_normalized,
             "companies_created": self.companies_created,
             "companies_matched": self.companies_matched,
+            "candidates_deferred": self.candidates_deferred,
             "candidates_rejected": self.candidates_rejected,
             "candidates_failed": self.candidates_failed,
         }
@@ -134,6 +141,7 @@ class DiscoveryService:
                 candidates_normalized=0,
                 companies_created=0,
                 companies_matched=0,
+                candidates_deferred=0,
                 candidates_rejected=0,
                 candidates_failed=0,
             )
@@ -186,10 +194,11 @@ class DiscoveryService:
                     counters.candidates_rejected += 1
                     continue
 
-                duplicate_key = (
-                    f"domain:{normalized.normalized_domain}"
-                    if normalized.normalized_domain
-                    else f"source:{source}:{normalized.source_identifier}"
+                duplicate_key = build_candidate_identity(
+                    source.value,
+                    normalized.source_identifier,
+                    normalized.normalized_domain,
+                    raw_candidate.raw_payload,
                 )
                 if duplicate_key in seen_keys:
                     self._reject_candidate(
@@ -201,9 +210,17 @@ class DiscoveryService:
                     continue
                 seen_keys.add(duplicate_key)
 
-                if not normalized.normalized_domain:
+                if source != DiscoverySource.HACKER_NEWS and not normalized.normalized_domain:
                     self._reject_candidate(candidate, "missing_normalized_domain")
                     counters.candidates_rejected += 1
+                    continue
+
+                defer_reason = self._deferred_reason_for_candidate(
+                    source, raw_candidate, normalized.normalized_domain
+                )
+                if defer_reason is not None:
+                    self._defer_candidate(candidate, defer_reason)
+                    counters.candidates_deferred += 1
                     continue
 
                 existing_company = self.company_repository.get_by_domain(
@@ -341,6 +358,20 @@ class DiscoveryService:
             },
         )
 
+    def _defer_candidate(
+        self,
+        candidate: DiscoveryCandidate,
+        reason: str,
+    ) -> None:
+        self.candidate_repository.update_candidate(
+            candidate,
+            {
+                "status": DiscoveryCandidateStatus.NORMALIZED,
+                "decision": DiscoveryDecision.DEFERRED,
+                "deferred_reason": reason,
+            },
+        )
+
     def _mark_candidate_failed(
         self, candidate: DiscoveryCandidate, exc: Exception
     ) -> None:
@@ -378,12 +409,16 @@ class DiscoveryService:
     def _finish_run(
         self, run: DiscoveryRun, counters: DiscoveryCounters
     ) -> DiscoveryRun:
-        successes = counters.companies_created + counters.companies_matched
+        successes = (
+            counters.companies_created
+            + counters.companies_matched
+            + counters.candidates_deferred
+        )
         problems = counters.candidates_rejected + counters.candidates_failed
         if counters.candidates_found == 0 or successes == 0:
             return self.run_repository.mark_failed(
                 run,
-                "No candidates were successfully ingested",
+                "No candidates were successfully processed",
                 counters.as_dict(),
             )
         if problems:
@@ -396,3 +431,27 @@ class DiscoveryService:
             raise NotFoundError("Discovery run not found")
         candidates = self.candidate_repository.list_by_run(run_id, limit=1000)
         return DiscoveryRunResult(run=run, candidates=candidates)
+
+    def _deferred_reason_for_candidate(
+        self,
+        source: DiscoverySource,
+        raw_candidate: RawStartupCandidate,
+        normalized_domain: str | None,
+    ) -> str | None:
+        if source != DiscoverySource.HACKER_NEWS:
+            return None
+
+        feed = get_hacker_news_feed(raw_candidate)
+        classification = get_candidate_url_classification(raw_candidate)
+        url_type = classification.get("url_type")
+
+        if feed == "show":
+            return "requires_startup_qualification"
+
+        if normalized_domain and not classification:
+            return None
+
+        if url_type != CandidateUrlType.FIRST_PARTY.value or not normalized_domain:
+            return "requires_company_domain_enrichment"
+
+        return None

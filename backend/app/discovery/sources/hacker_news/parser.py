@@ -1,10 +1,13 @@
 import re
 from datetime import datetime, timezone
 from html import unescape
-from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
+from app.discovery.url_classifier import (
+    CandidateUrlType,
+    classify_candidate_url,
+)
 from app.discovery.sources.hacker_news.schemas import (
     HackerNewsDiscoveryRequest,
     HackerNewsItem,
@@ -13,15 +16,6 @@ from app.schemas.discovery import DiscoveryEvidenceInput
 
 MAX_EXCERPT_LENGTH = 500
 MAX_CANDIDATE_NAME_LENGTH = 80
-HN_DOMAINS = {"news.ycombinator.com", "hn.algolia.com", "hacker-news.firebaseio.com"}
-JOB_BOARD_DOMAINS = {
-    "greenhouse.io",
-    "lever.co",
-    "ashbyhq.com",
-    "workable.com",
-    "bamboohr.com",
-    "job-boards.greenhouse.io",
-}
 
 
 def clean_hacker_news_html(value: str | None) -> str | None:
@@ -32,9 +26,10 @@ def clean_hacker_news_html(value: str | None) -> str | None:
         tag.decompose()
     text = soup.get_text(separator="\n")
     text = unescape(text)
-    text = re.sub(r"[ \t\r\f\v]+", " ", text)
+    text = re.sub(r"[\u00a0\u2007\u202f\t\r\f\v]+", " ", text)
     text = re.sub(r"\n\s*\n+", "\n\n", text)
-    text = re.sub(r" *\n *", "\n", text).strip()
+    text = re.sub(r" *\n *", "\n", text)
+    text = re.sub(r"[^\S\n]+", " ", text).strip()
     return text or None
 
 
@@ -56,15 +51,10 @@ def extract_candidate_name(item: HackerNewsItem) -> str | None:
 def extract_candidate_website(item: HackerNewsItem) -> str | None:
     if not item.url:
         return None
-    parsed = urlparse(item.url)
-    domain = (parsed.netloc or "").lower()
-    if domain.startswith("www."):
-        domain = domain[4:]
-    if not domain or domain in HN_DOMAINS:
-        return None
-    if any(domain == job_domain or domain.endswith(f".{job_domain}") for job_domain in JOB_BOARD_DOMAINS):
-        return None
-    return item.url
+    classification = classify_candidate_url(item.url)
+    if classification.url_type == CandidateUrlType.FIRST_PARTY:
+        return classification.first_party_url
+    return None
 
 
 def build_candidate_description(item: HackerNewsItem) -> str | None:
@@ -104,9 +94,18 @@ def is_candidate_item(item: HackerNewsItem, request: HackerNewsDiscoveryRequest)
         return False
     if request.minimum_score is not None and (item.score or 0) < request.minimum_score:
         return False
-    if extract_candidate_name(item) is None:
+    classification = classify_candidate_url(item.url)
+    has_identity = (
+        extract_candidate_name(item) is not None
+        or classification.external_company_slug is not None
+        or classification.is_first_party_company_domain
+    )
+    if not has_identity:
         return False
-    if not request.include_items_without_website and extract_candidate_website(item) is None:
+    if (
+        not request.include_items_without_website
+        and classification.url_type != CandidateUrlType.FIRST_PARTY
+    ):
         return False
     return True
 
@@ -132,6 +131,8 @@ def _clean_candidate_name(value: str | None) -> str | None:
         return None
     name = re.sub(r"\s+", " ", value).strip(" \t\n\r-:|,.;()[]{}")
     if not name or len(name) > MAX_CANDIDATE_NAME_LENGTH:
+        return None
+    if name.lower().startswith("stealth ") or name.lower() == "stealth":
         return None
     if len(name.split()) > 8:
         return None

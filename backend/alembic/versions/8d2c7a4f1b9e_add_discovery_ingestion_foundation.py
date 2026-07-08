@@ -57,6 +57,7 @@ discovery_candidate_status = sa.Enum(
 discovery_decision = sa.Enum(
     "created_company",
     "matched_existing_company",
+    "deferred",
     "rejected",
     "failed",
     name="discoverydecision",
@@ -75,6 +76,7 @@ def upgrade() -> None:
         sa.Column("candidates_normalized", sa.Integer(), nullable=False),
         sa.Column("companies_created", sa.Integer(), nullable=False),
         sa.Column("companies_matched", sa.Integer(), nullable=False),
+        sa.Column("candidates_deferred", sa.Integer(), nullable=False),
         sa.Column("candidates_rejected", sa.Integer(), nullable=False),
         sa.Column("candidates_failed", sa.Integer(), nullable=False),
         sa.Column("error_message", sa.Text(), nullable=True),
@@ -119,6 +121,7 @@ def upgrade() -> None:
         sa.Column("status", discovery_candidate_status, nullable=False),
         sa.Column("decision", discovery_decision, nullable=True),
         sa.Column("rejection_reason", sa.String(), nullable=True),
+        sa.Column("deferred_reason", sa.String(), nullable=True),
         sa.Column("error_message", sa.Text(), nullable=True),
         sa.Column("matched_company_id", sa.String(), nullable=True),
         sa.Column("raw_payload", sa.JSON(), nullable=True),
