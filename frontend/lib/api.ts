@@ -4,7 +4,7 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
   "http://127.0.0.1:8000";
 
-type ApiMethod = "GET" | "POST" | "PATCH" | "DELETE";
+type ApiMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 type RequestOptions = {
   method?: ApiMethod;
@@ -109,6 +109,8 @@ export const api = {
     apiRequest<T>(path, { method: "GET", params }),
   post: <T>(path: string, body?: unknown) =>
     apiRequest<T>(path, { method: "POST", body }),
+  put: <T>(path: string, body?: unknown) =>
+    apiRequest<T>(path, { method: "PUT", body }),
   patch: <T>(path: string, body?: unknown) =>
     apiRequest<T>(path, { method: "PATCH", body }),
   delete: <T>(path: string) => apiRequest<T>(path, { method: "DELETE" }),
