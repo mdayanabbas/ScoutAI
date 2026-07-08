@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 
 import {
   createCompanyJob,
@@ -19,7 +24,19 @@ import type {
 export const jobKeys = {
   all: ["jobs"] as const,
   lists: () => [...jobKeys.all, "list"] as const,
-  list: (params: ListJobsParams) => [...jobKeys.lists(), params] as const,
+  list: (params: ListJobsParams) =>
+    [
+      ...jobKeys.lists(),
+      {
+        page: params.page,
+        pageSize: params.page_size,
+        search: params.search,
+        roleCategory: params.role_category,
+        remoteType: params.remote_type,
+        status: params.status,
+        companyId: params.company_id,
+      },
+    ] as const,
   company: (companyId: string) => [...jobKeys.all, "company", companyId] as const,
   detail: (jobId: string) => [...jobKeys.all, "detail", jobId] as const,
 };
@@ -28,6 +45,7 @@ export function useJobs(params: ListJobsParams = {}) {
   return useQuery({
     queryKey: jobKeys.list(params),
     queryFn: () => listJobs(params),
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -57,6 +75,7 @@ export function useCreateCompanyJob(companyId: string) {
     mutationFn: (data: JobCreateInput) => createCompanyJob(companyId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: jobKeys.company(companyId) });
+      queryClient.invalidateQueries({ queryKey: jobKeys.all });
       queryClient.invalidateQueries({ queryKey: jobKeys.lists() });
       queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
     },
@@ -79,6 +98,7 @@ export function useUpdateJob() {
     onSuccess: (job, variables) => {
       queryClient.invalidateQueries({ queryKey: jobKeys.company(variables.companyId) });
       queryClient.invalidateQueries({ queryKey: jobKeys.detail(job.id) });
+      queryClient.invalidateQueries({ queryKey: jobKeys.all });
       queryClient.invalidateQueries({ queryKey: jobKeys.lists() });
       queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
     },
@@ -93,6 +113,7 @@ export function useDeleteJob(companyId: string) {
     onSuccess: (_response, jobId) => {
       queryClient.invalidateQueries({ queryKey: jobKeys.company(companyId) });
       queryClient.invalidateQueries({ queryKey: jobKeys.detail(jobId) });
+      queryClient.invalidateQueries({ queryKey: jobKeys.all });
       queryClient.invalidateQueries({ queryKey: jobKeys.lists() });
       queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
     },

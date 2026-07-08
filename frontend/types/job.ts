@@ -20,13 +20,12 @@ export type RemoteType =
 
 export type JobStatus = "active" | "inactive" | "expired" | "unknown";
 
-export type Job = {
+export type JobListItem = {
   id: string;
   company_id: string;
   title: string;
   normalized_title: string | null;
   role_category: RoleCategory | null;
-  description: string | null;
   location: string | null;
   remote_type: RemoteType | null;
   experience_min: number | null;
@@ -41,6 +40,10 @@ export type Job = {
   last_seen_at: string | null;
   created_at: string;
   updated_at: string | null;
+};
+
+export type Job = JobListItem & {
+  description: string | null;
 };
 
 export type JobCreateInput = {
@@ -72,6 +75,8 @@ export type ListJobsParams = {
   status?: JobStatus;
   search?: string;
 };
+
+export type JobListParams = ListJobsParams;
 
 export type ListCompanyJobsParams = {
   page?: number;
