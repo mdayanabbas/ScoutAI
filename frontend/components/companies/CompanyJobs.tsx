@@ -17,9 +17,14 @@ import {
   useJob,
   useUpdateJob,
 } from "@/hooks/use-jobs";
-import type { Job, JobCreateInput, JobUpdateInput } from "@/types/job";
+import type {
+  Job,
+  JobCreateInput,
+  JobListItem,
+  JobUpdateInput,
+} from "@/types/job";
 
-function experienceRange(job: Job) {
+function experienceRange(job: JobListItem) {
   if (job.experience_min === null && job.experience_max === null) {
     return "None";
   }
@@ -33,14 +38,14 @@ export function CompanyJobs({
   error,
 }: {
   companyId: string;
-  jobs?: Job[];
+  jobs?: JobListItem[];
   isLoading?: boolean;
   error?: Error | null;
 }) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [viewingJobId, setViewingJobId] = useState<string | null>(null);
-  const [editingJob, setEditingJob] = useState<Job | null>(null);
-  const [deletingJob, setDeletingJob] = useState<Job | null>(null);
+  const [editingJob, setEditingJob] = useState<JobListItem | null>(null);
+  const [deletingJob, setDeletingJob] = useState<JobListItem | null>(null);
   const createJob = useCreateCompanyJob(companyId);
   const updateJob = useUpdateJob();
   const deleteJob = useDeleteJob(companyId);
@@ -61,7 +66,7 @@ export function CompanyJobs({
     closeCreate();
   }
 
-  function openEdit(job: Job) {
+  function openEdit(job: JobListItem) {
     updateJob.reset();
     setEditingJob(job);
   }
@@ -84,7 +89,7 @@ export function CompanyJobs({
     closeEdit();
   }
 
-  function openDelete(job: Job) {
+  function openDelete(job: JobListItem) {
     deleteJob.reset();
     setDeletingJob(job);
   }
