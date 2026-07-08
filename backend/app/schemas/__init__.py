@@ -44,6 +44,16 @@ from app.schemas.dashboard import (
     DashboardSummary,
     RecentActivityItem,
 )
+from app.schemas.discovery import (
+    DiscoveryCandidateRead,
+    DiscoveryEvidenceInput,
+    DiscoveryEvidenceRead,
+    DiscoveryRunRead,
+    DiscoveryRunResult,
+    ManualDiscoveryRequest,
+    NormalizedStartupCandidate,
+    RawStartupCandidate,
+)
 from app.schemas.job import JobBase, JobCreate, JobListItem, JobRead, JobUpdate
 from app.schemas.tech_stack_item import (
     TechStackItemBase,
@@ -87,6 +97,11 @@ __all__ = [
     "DashboardMetric",
     "DashboardResponse",
     "DashboardSummary",
+    "DiscoveryCandidateRead",
+    "DiscoveryEvidenceInput",
+    "DiscoveryEvidenceRead",
+    "DiscoveryRunRead",
+    "DiscoveryRunResult",
     "ErrorBody",
     "ErrorResponse",
     "JobBase",
@@ -95,9 +110,12 @@ __all__ = [
     "JobRead",
     "JobUpdate",
     "MessageResponse",
+    "ManualDiscoveryRequest",
+    "NormalizedStartupCandidate",
     "PaginatedResponse",
     "PaginationParams",
     "RecentActivityItem",
+    "RawStartupCandidate",
     "TechStackItemBase",
     "TechStackItemCreate",
     "TechStackItemRead",

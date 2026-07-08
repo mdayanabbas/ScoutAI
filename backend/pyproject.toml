@@ -12,6 +12,7 @@ description = "AI-powered startup intelligence platform backend"
 requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.14.0",
+    "beautifulsoup4>=4.12.0",
     "fastapi>=0.115.0",
     "httpx>=0.28.0",
     "psycopg[binary]>=3.2.0",

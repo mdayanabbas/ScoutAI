@@ -22,6 +22,44 @@ class CompanySource(StrEnum):
     OTHER = "other"
 
 
+class DiscoverySource(StrEnum):
+    MANUAL = "manual"
+    HACKER_NEWS = "hacker_news"
+    PRODUCT_HUNT = "product_hunt"
+    YC = "yc"
+    WELLFOUND = "wellfound"
+    VC_PORTFOLIO = "vc_portfolio"
+    RSS = "rss"
+    NEWSLETTER = "newsletter"
+    COMPANY_DIRECTORY = "company_directory"
+    OTHER = "other"
+
+
+class DiscoveryRunStatus(StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    SUCCESS = "success"
+    PARTIAL_SUCCESS = "partial_success"
+    FAILED = "failed"
+
+
+class DiscoveryCandidateStatus(StrEnum):
+    DISCOVERED = "discovered"
+    NORMALIZED = "normalized"
+    DUPLICATE = "duplicate"
+    REJECTED = "rejected"
+    INGESTED = "ingested"
+    FAILED = "failed"
+
+
+class DiscoveryDecision(StrEnum):
+    CREATED_COMPANY = "created_company"
+    MATCHED_EXISTING_COMPANY = "matched_existing_company"
+    DEFERRED = "deferred"
+    REJECTED = "rejected"
+    FAILED = "failed"
+
+
 class PageType(StrEnum):
     HOMEPAGE = "homepage"
     ABOUT = "about"
