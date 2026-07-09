@@ -60,6 +60,32 @@ class DiscoveryDecision(StrEnum):
     FAILED = "failed"
 
 
+class CompanyEnrichmentStatus(StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    RESOLVED = "resolved"
+    UNRESOLVED = "unresolved"
+    FAILED = "failed"
+
+
+class CompanyEnrichmentResolver(StrEnum):
+    EXISTING_URL = "existing_url"
+    DESCRIPTION_URL = "description_url"
+    EVIDENCE_URL = "evidence_url"
+    BUSINESS_EMAIL_DOMAIN = "business_email_domain"
+    YCOMBINATOR_PROFILE = "ycombinator_profile"
+    MANUAL = "manual"
+    OTHER = "other"
+
+
+class CompanyEnrichmentDecision(StrEnum):
+    CREATED_COMPANY = "created_company"
+    MATCHED_EXISTING_COMPANY = "matched_existing_company"
+    UNRESOLVED = "unresolved"
+    REJECTED = "rejected"
+    FAILED = "failed"
+
+
 class PageType(StrEnum):
     HOMEPAGE = "homepage"
     ABOUT = "about"
