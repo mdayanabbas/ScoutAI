@@ -23,6 +23,8 @@ export type JobStatus = "active" | "inactive" | "expired" | "unknown";
 export type JobListItem = {
   id: string;
   company_id: string;
+  company_name: string | null;
+  company_website_url: string | null;
   title: string;
   normalized_title: string | null;
   role_category: RoleCategory | null;

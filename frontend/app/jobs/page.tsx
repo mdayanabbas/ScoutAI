@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { JobDetails } from "@/components/jobs/JobDetails";
 import { JobTable } from "@/components/jobs/JobTable";
@@ -66,6 +66,14 @@ function optionValue<T extends string>(
 }
 
 export default function JobsPage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <JobsPageContent />
+    </Suspense>
+  );
+}
+
+function JobsPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();

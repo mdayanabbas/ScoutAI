@@ -7,7 +7,6 @@ import {
   formatJobDate,
   formatJobLabel,
   isValidJobUrl,
-  shortCompanyId,
 } from "@/components/jobs/job-format";
 import type { JobListItem } from "@/types/job";
 
@@ -37,6 +36,7 @@ export function JobTable({
         <tbody className="divide-y divide-[#edf0f5]">
           {jobs.map((job) => {
             const canOpenJob = isValidJobUrl(job.job_url);
+            const companyName = job.company_name ?? "Unknown company";
 
             return (
               <tr key={job.id} className="align-top">
@@ -50,9 +50,9 @@ export function JobTable({
                   <Link
                     href={`/companies/${job.company_id}`}
                     className="text-[#175cd3] hover:underline"
-                    title={job.company_id}
+                    title={companyName}
                   >
-                    {shortCompanyId(job.company_id)}
+                    {companyName}
                   </Link>
                 </td>
                 <td className="px-4 py-4 text-[#475467]">
