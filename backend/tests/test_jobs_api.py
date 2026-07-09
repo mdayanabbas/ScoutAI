@@ -54,6 +54,8 @@ async def test_create_company_job(jobs_api_client: AsyncClient):
     data = response.json()
     assert data["id"]
     assert data["company_id"] == company_id
+    assert data["company_name"] == "Jobs Co"
+    assert data["company_website_url"] == "jobs-co.example"
     assert data["title"] == "Senior AI Engineer"
     assert data["normalized_title"] == "senior ai engineer"
     assert data["role_category"] == "ai_engineer"
@@ -116,6 +118,9 @@ async def test_list_jobs_returns_paginated_response(jobs_api_client: AsyncClient
     assert data["has_next"] is False
     assert data["has_prev"] is False
     assert data["items"][0]["title"] == "Senior AI Engineer"
+    assert data["items"][0]["company_id"] == company_id
+    assert data["items"][0]["company_name"] == "Jobs Co"
+    assert data["items"][0]["company_website_url"] == "jobs-co.example"
     assert "description" not in data["items"][0]
 
 
@@ -191,6 +196,9 @@ async def test_get_job_returns_full_job(jobs_api_client: AsyncClient):
 
     assert response.status_code == 200
     assert response.json()["id"] == job_id
+    assert response.json()["company_id"] == company_id
+    assert response.json()["company_name"] == "Jobs Co"
+    assert response.json()["company_website_url"] == "jobs-co.example"
     assert response.json()["description"] == "Full job description"
 
 

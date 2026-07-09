@@ -19,6 +19,7 @@ from app.utils.enums import JobStatus, RemoteType, RoleCategory
 if TYPE_CHECKING:
     from app.models.agent_run import AgentRun
     from app.models.company import Company
+    from app.models.discovery_candidate import DiscoveryCandidate
 
 
 class Job(Base, UUIDMixin, TimestampMixin):
@@ -26,6 +27,11 @@ class Job(Base, UUIDMixin, TimestampMixin):
 
     company_id: Mapped[str] = mapped_column(
         ForeignKey("companies.id", ondelete="CASCADE"), index=True
+    )
+    discovery_candidate_id: Mapped[str | None] = mapped_column(
+        ForeignKey("discovery_candidates.id", ondelete="SET NULL"),
+        unique=True,
+        index=True,
     )
     title: Mapped[str] = mapped_column(String, index=True)
     normalized_title: Mapped[str | None] = mapped_column(String, index=True)
@@ -71,6 +77,7 @@ class Job(Base, UUIDMixin, TimestampMixin):
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     company: Mapped["Company"] = relationship(back_populates="jobs")
+    discovery_candidate: Mapped["DiscoveryCandidate | None"] = relationship()
     agent_runs: Mapped[list["AgentRun"]] = relationship(back_populates="job")
 
     __table_args__ = (UniqueConstraint("company_id", "job_url"),)

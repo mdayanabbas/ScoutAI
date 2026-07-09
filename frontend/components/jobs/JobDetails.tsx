@@ -7,8 +7,7 @@ import {
   formatJobDate,
   formatJobLabel,
   formatSalary,
-  isValidJobUrl,
-  shortCompanyId,
+  normalizeJobUrl,
 } from "@/components/jobs/job-format";
 import { useJob } from "@/hooks/use-jobs";
 import type { Job } from "@/types/job";
@@ -38,7 +37,8 @@ export function JobDetails({ jobId }: { jobId: string }) {
 }
 
 function JobDetailsContent({ job }: { job: Job }) {
-  const canOpenJob = isValidJobUrl(job.job_url);
+  const jobUrl = normalizeJobUrl(job.job_url);
+  const companyName = job.company_name ?? "Unknown company";
 
   return (
     <div className="space-y-5">
@@ -50,15 +50,15 @@ function JobDetailsContent({ job }: { job: Job }) {
               href={`/companies/${job.company_id}`}
               className="text-[#175cd3] hover:underline"
             >
-              Company {shortCompanyId(job.company_id)}
+              {companyName}
             </Link>
             <span>{formatJobLabel(job.role_category)}</span>
             <span>{job.location ?? "Not specified"}</span>
           </div>
         </div>
-        {canOpenJob ? (
+        {jobUrl ? (
           <a
-            href={job.job_url ?? undefined}
+            href={jobUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#24314a]"
