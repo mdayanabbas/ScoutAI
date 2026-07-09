@@ -61,14 +61,23 @@ export function shortCompanyId(companyId: string) {
 }
 
 export function isValidJobUrl(value: string | null | undefined) {
-  if (!value) {
-    return false;
+  return normalizeJobUrl(value) !== null;
+}
+
+export function normalizeJobUrl(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return null;
   }
 
   try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
+    const url = new URL(
+      /^[a-z][a-z\d+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`,
+    );
+    return url.protocol === "http:" || url.protocol === "https:"
+      ? url.toString()
+      : null;
   } catch {
-    return false;
+    return null;
   }
 }

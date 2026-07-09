@@ -6,9 +6,16 @@ from pydantic import ValidationError
 from app.schemas.job import JobCreate, JobRead, JobUpdate
 
 
+class CompanyObj:
+    name = "Acme AI"
+    website_url = "acme.ai"
+
+
 class JobObj:
     id = "job-1"
     company_id = "company-1"
+    company = CompanyObj()
+    discovery_candidate_id = None
     title = "AI Engineer"
     normalized_title = "ai engineer"
     role_category = "other"
@@ -29,6 +36,12 @@ class JobObj:
     updated_at = None
 
 
+class BrokenCompanyJobObj(JobObj):
+    @property
+    def company(self):
+        raise RuntimeError("company relationship unavailable")
+
+
 def test_job_create_requires_title_and_job_url():
     with pytest.raises(ValidationError):
         JobCreate(title="AI Engineer")
@@ -39,7 +52,18 @@ def test_job_update_allows_partial_update():
 
 
 def test_job_read_supports_from_attributes():
-    assert JobRead.model_validate(JobObj()).normalized_title == "ai engineer"
+    job = JobRead.model_validate(JobObj())
+
+    assert job.normalized_title == "ai engineer"
+    assert job.company_name == "Acme AI"
+    assert job.company_website_url == "acme.ai"
+
+
+def test_job_read_uses_null_company_fields_when_relationship_unavailable():
+    job = JobRead.model_validate(BrokenCompanyJobObj())
+
+    assert job.company_name is None
+    assert job.company_website_url is None
 
 
 def test_invalid_experience_range_fails():

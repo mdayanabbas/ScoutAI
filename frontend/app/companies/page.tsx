@@ -209,7 +209,7 @@ export default function CompaniesPage() {
                   Edit Company
                 </h2>
                 <p className="mt-1 text-sm text-[#667085]">
-                  Update {editingCompany.name}'s profile details.
+                  Update {editingCompany.name}&apos;s profile details.
                 </p>
               </div>
               <button

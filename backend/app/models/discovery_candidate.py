@@ -12,6 +12,7 @@ from app.utils.enums import (
 
 if TYPE_CHECKING:
     from app.models.company import Company
+    from app.models.company_enrichment_attempt import CompanyEnrichmentAttempt
     from app.models.discovery_evidence import DiscoveryEvidence
     from app.models.discovery_run import DiscoveryRun
 
@@ -81,3 +82,8 @@ class DiscoveryCandidate(Base, UUIDMixin, TimestampMixin):
         passive_deletes=True,
     )
     matched_company: Mapped["Company | None"] = relationship()
+    enrichment_attempts: Mapped[list["CompanyEnrichmentAttempt"]] = relationship(
+        back_populates="discovery_candidate",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )

@@ -225,7 +225,7 @@ export default function CompanyDetailPage() {
                   Edit Company
                 </h2>
                 <p className="mt-1 text-sm text-[#667085]">
-                  Update {companyQuery.data.name}'s profile details.
+                  Update {companyQuery.data.name}&apos;s profile details.
                 </p>
               </div>
               <button

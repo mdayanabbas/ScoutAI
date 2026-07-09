@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.job import Job
 from app.repositories.base import BaseRepository
@@ -16,8 +16,32 @@ class JobRepository(BaseRepository[Job]):
     def get_by_company_and_url(
         self, company_id: str, job_url: str
     ) -> Job | None:
+        stmt = (
+            select(Job)
+            .options(selectinload(Job.company))
+            .where(Job.company_id == company_id, Job.job_url == job_url)
+        )
+        return self.session.scalar(stmt)
+
+    def get_by_id(self, id: str) -> Job | None:
+        stmt = select(Job).options(selectinload(Job.company)).where(Job.id == id)
+        return self.session.scalar(stmt)
+
+    def get_by_discovery_candidate_id(self, candidate_id: str) -> Job | None:
+        stmt = select(Job).where(Job.discovery_candidate_id == candidate_id)
+        return self.session.scalar(stmt)
+
+    def get_legacy_match(
+        self,
+        company_id: str,
+        job_url: str,
+        normalized_title: str,
+    ) -> Job | None:
         stmt = select(Job).where(
-            Job.company_id == company_id, Job.job_url == job_url
+            Job.company_id == company_id,
+            Job.job_url == job_url,
+            Job.normalized_title == normalized_title,
+            Job.discovery_candidate_id.is_(None),
         )
         return self.session.scalar(stmt)
 
@@ -58,7 +82,7 @@ class JobRepository(BaseRepository[Job]):
         stmt = self._build_list_query(
             company_id, role_category, remote_type, status, search
         )
-        stmt = stmt.offset(offset).limit(limit)
+        stmt = stmt.options(selectinload(Job.company)).offset(offset).limit(limit)
         return list(self.session.scalars(stmt).all())
 
     def list_active_jobs(
@@ -104,7 +128,12 @@ class JobRepository(BaseRepository[Job]):
         return self.session.scalar(stmt) or 0
 
     def list_recent(self, limit: int = 20) -> list[Job]:
-        stmt = select(Job).order_by(Job.created_at.desc()).limit(limit)
+        stmt = (
+            select(Job)
+            .options(selectinload(Job.company))
+            .order_by(Job.created_at.desc())
+            .limit(limit)
+        )
         return list(self.session.scalars(stmt).all())
 
     def create_job(self, job: Job) -> Job:
