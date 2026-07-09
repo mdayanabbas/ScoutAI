@@ -11,6 +11,7 @@ import {
   StatusBadge,
 } from "@/components/companies/detail-format";
 import { JobForm } from "@/components/jobs/JobForm";
+import { normalizeJobUrl } from "@/components/jobs/job-format";
 import {
   useCreateCompanyJob,
   useDeleteJob,
@@ -140,11 +141,14 @@ export function CompanyJobs({
       ) : null}
       {!isLoading && !error && jobs && jobs.length > 0 ? (
         <div className="space-y-3">
-          {jobs.map((job) => (
-            <article
-              key={job.id}
-              className="rounded-md border border-[#edf0f5] p-4"
-            >
+          {jobs.map((job) => {
+            const jobUrl = normalizeJobUrl(job.job_url);
+
+            return (
+              <article
+                key={job.id}
+                className="rounded-md border border-[#edf0f5] p-4"
+              >
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-[#171923]">
@@ -163,23 +167,26 @@ export function CompanyJobs({
                 <span>Role: {formatLabel(job.role_category)}</span>
                 <span>Created: {formatDateTime(job.created_at)}</span>
                 <a
-                  href={job.job_url ?? "#"}
+                  href={jobUrl ?? undefined}
                   target="_blank"
-                  rel="noreferrer"
+                  rel="noopener noreferrer"
+                  aria-disabled={!jobUrl}
                   className="truncate text-[#175cd3] hover:underline"
                 >
                   {job.job_url ?? "No URL"}
                 </a>
               </div>
               <div className="mt-4 flex flex-wrap justify-end gap-2">
-                <a
-                  href={job.job_url ?? "#"}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded border border-[#c8ced8] bg-white px-2.5 py-1.5 text-xs font-medium text-[#344054] hover:bg-[#f8fafc]"
-                >
-                  Open
-                </a>
+                {jobUrl ? (
+                  <a
+                    href={jobUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded border border-[#c8ced8] bg-white px-2.5 py-1.5 text-xs font-medium text-[#344054] hover:bg-[#f8fafc]"
+                  >
+                    Open
+                  </a>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => setViewingJobId(job.id)}
@@ -205,8 +212,9 @@ export function CompanyJobs({
                     : "Delete"}
                 </button>
               </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       ) : null}
 

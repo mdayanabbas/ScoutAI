@@ -6,7 +6,7 @@ import {
   formatExperience,
   formatJobDate,
   formatJobLabel,
-  isValidJobUrl,
+  normalizeJobUrl,
 } from "@/components/jobs/job-format";
 import type { JobListItem } from "@/types/job";
 
@@ -35,7 +35,7 @@ export function JobTable({
         </thead>
         <tbody className="divide-y divide-[#edf0f5]">
           {jobs.map((job) => {
-            const canOpenJob = isValidJobUrl(job.job_url);
+            const jobUrl = normalizeJobUrl(job.job_url);
             const companyName = job.company_name ?? "Unknown company";
 
             return (
@@ -82,9 +82,9 @@ export function JobTable({
                     >
                       View
                     </button>
-                    {canOpenJob ? (
+                    {jobUrl ? (
                       <a
-                        href={job.job_url ?? undefined}
+                        href={jobUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="rounded border border-[#c8ced8] bg-white px-2.5 py-1.5 text-xs font-medium text-[#344054] hover:bg-[#f8fafc]"
