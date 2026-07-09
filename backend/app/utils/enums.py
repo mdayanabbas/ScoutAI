@@ -74,6 +74,7 @@ class CompanyEnrichmentResolver(StrEnum):
     EVIDENCE_URL = "evidence_url"
     BUSINESS_EMAIL_DOMAIN = "business_email_domain"
     YCOMBINATOR_PROFILE = "ycombinator_profile"
+    ASHBY_PUBLIC_JOB_BOARD = "ashby_public_job_board"
     MANUAL = "manual"
     OTHER = "other"
 

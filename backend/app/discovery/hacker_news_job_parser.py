@@ -34,7 +34,7 @@ def parse_hacker_news_job(candidate: DiscoveryCandidate) -> ParsedHackerNewsJob:
         description=description,
         location=extract_job_location(candidate),
         remote_type=extract_remote_signal(candidate),
-        role_category=_role_category_for_title(title),
+        role_category=role_category_for_title(title),
         job_url=select_job_url(candidate),
     )
 
@@ -159,7 +159,7 @@ def _clean_location(value: str) -> str | None:
     return location or None
 
 
-def _role_category_for_title(title: str) -> RoleCategory:
+def role_category_for_title(title: str) -> RoleCategory:
     value = title.lower()
     if "backend" in value:
         return RoleCategory.BACKEND_ENGINEER
