@@ -1,6 +1,7 @@
 from app.models.agent_run import AgentRun
 from app.models.agent_step import AgentStep
 from app.models.company import Company
+from app.models.company_enrichment_attempt import CompanyEnrichmentAttempt
 from app.models.company_page import CompanyPage
 from app.models.crawl_run import CrawlRun
 from app.models.discovery_candidate import DiscoveryCandidate
@@ -14,6 +15,7 @@ __all__ = [
     "AgentRun",
     "AgentStep",
     "Company",
+    "CompanyEnrichmentAttempt",
     "CompanyPage",
     "CrawlRun",
     "DiscoveryCandidate",

@@ -30,6 +30,12 @@ from app.schemas.company_page import (
     CompanyPageRead,
     CompanyPageUpdate,
 )
+from app.schemas.company_enrichment import (
+    CandidateEnrichmentResult,
+    CompanyEnrichmentAttemptRead,
+    ManualCompanyDomainInput,
+    RunEnrichmentResult,
+)
 from app.schemas.crawler import (
     CrawlRunCreate,
     CrawlRunListItem,
@@ -53,6 +59,10 @@ from app.schemas.discovery import (
     ManualDiscoveryRequest,
     NormalizedStartupCandidate,
     RawStartupCandidate,
+)
+from app.schemas.discovery_job_ingestion import (
+    DiscoveryJobIngestionResult,
+    DiscoveryRunJobIngestionResult,
 )
 from app.schemas.job import JobBase, JobCreate, JobListItem, JobRead, JobUpdate
 from app.schemas.tech_stack_item import (
@@ -88,6 +98,8 @@ __all__ = [
     "CompanyPageUpdate",
     "CompanyRead",
     "CompanyUpdate",
+    "CandidateEnrichmentResult",
+    "CompanyEnrichmentAttemptRead",
     "CrawlRunCreate",
     "CrawlRunListItem",
     "CrawlRunMarkFailedRequest",
@@ -102,6 +114,8 @@ __all__ = [
     "DiscoveryEvidenceRead",
     "DiscoveryRunRead",
     "DiscoveryRunResult",
+    "DiscoveryJobIngestionResult",
+    "DiscoveryRunJobIngestionResult",
     "ErrorBody",
     "ErrorResponse",
     "JobBase",
@@ -110,12 +124,14 @@ __all__ = [
     "JobRead",
     "JobUpdate",
     "MessageResponse",
+    "ManualCompanyDomainInput",
     "ManualDiscoveryRequest",
     "NormalizedStartupCandidate",
     "PaginatedResponse",
     "PaginationParams",
     "RecentActivityItem",
     "RawStartupCandidate",
+    "RunEnrichmentResult",
     "TechStackItemBase",
     "TechStackItemCreate",
     "TechStackItemRead",
