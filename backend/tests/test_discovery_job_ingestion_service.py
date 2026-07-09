@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import pytest
 
 from app.models.discovery_candidate import DiscoveryCandidate
+from app.models.discovery_evidence import DiscoveryEvidence
 from app.models.discovery_run import DiscoveryRun
 from app.services.company_service import CompanyService
 from app.services.discovery_job_ingestion_service import DiscoveryJobIngestionService
@@ -123,3 +124,40 @@ def test_run_ingestion_returns_counters(db_session):
     assert result.candidates_examined == 1
     assert result.jobs_created == 1
     assert result.candidates_skipped == 0
+
+
+def test_resolved_ashby_candidate_uses_focused_posting_evidence(db_session):
+    candidate, _company, _run_obj = _resolved_candidate(db_session)
+    db_session.add(
+        DiscoveryEvidence(
+            discovery_candidate_id=candidate.id,
+            evidence_type="ashby_job_posting",
+            source_url="https://jobs.ashbyhq.com/acme/posting-id",
+            title="Exact Ashby Platform Engineer",
+            excerpt="Short excerpt",
+            published_at=datetime(2026, 7, 1, tzinfo=timezone.utc),
+            metadata_json={
+                "identity": "posting-id",
+                "description_plain": "Full Ashby job description",
+                "location": "New York",
+                "workplace_type": "Hybrid",
+                "is_remote": False,
+                "employment_type": "FullTime",
+                "job_url": "https://jobs.ashbyhq.com/acme/posting-id",
+                "apply_url": "https://jobs.ashbyhq.com/acme/posting-id/application",
+                "published_at": "2026-07-01T00:00:00+00:00",
+            },
+        )
+    )
+    db_session.commit()
+
+    result = DiscoveryJobIngestionService(db_session).ingest_candidate(candidate.id)
+
+    assert result.action == "created"
+    assert result.job is not None
+    assert result.job.title == "Exact Ashby Platform Engineer"
+    assert result.job.description == "Full Ashby job description"
+    assert result.job.location == "New York"
+    assert result.job.remote_type == "hybrid"
+    assert result.job.source_platform == "ashby"
+    assert result.job.job_url == "jobs.ashbyhq.com/acme/posting-id"

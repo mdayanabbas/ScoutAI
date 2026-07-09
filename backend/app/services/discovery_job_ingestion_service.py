@@ -6,8 +6,10 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.errors import NotFoundError
 from app.discovery.hacker_news_job_parser import (
+    ParsedHackerNewsJob,
     is_hacker_news_hiring_candidate,
     parse_hacker_news_job,
+    role_category_for_title,
 )
 from app.models.discovery_candidate import DiscoveryCandidate
 from app.models.job import Job
@@ -19,7 +21,12 @@ from app.schemas.discovery_job_ingestion import (
     DiscoveryRunJobIngestionResult,
 )
 from app.services.job_service import JobService
-from app.utils.enums import DiscoveryCandidateStatus, DiscoveryDecision, JobStatus
+from app.utils.enums import (
+    DiscoveryCandidateStatus,
+    DiscoveryDecision,
+    JobStatus,
+    RemoteType,
+)
 from app.utils.text import normalize_title
 from app.utils.urls import normalize_url
 
@@ -44,7 +51,7 @@ class DiscoveryJobIngestionService:
         if existing is not None:
             return self._already_exists(candidate, existing)
 
-        parsed = parse_hacker_news_job(candidate)
+        parsed, ashby_metadata = self._parse_job(candidate)
         normalized_job_url = normalize_url(parsed.job_url)
         normalized_job_title = normalize_title(parsed.title) or parsed.title.lower()
         legacy = self.job_repository.get_legacy_match(
@@ -72,9 +79,12 @@ class DiscoveryJobIngestionService:
                 "remote_type": parsed.remote_type,
                 "role_category": parsed.role_category,
                 "job_url": parsed.job_url,
-                "source_platform": "hacker_news",
+                "source_platform": "ashby" if ashby_metadata else "hacker_news",
                 "status": JobStatus.ACTIVE,
-                "first_seen_at": datetime.now(timezone.utc),
+                "first_seen_at": (
+                    _ashby_published_at(ashby_metadata)
+                    or datetime.now(timezone.utc)
+                ),
                 "last_seen_at": datetime.now(timezone.utc),
             },
         )
@@ -135,6 +145,37 @@ class DiscoveryJobIngestionService:
             results=results,
         )
 
+    def _parse_job(
+        self, candidate: DiscoveryCandidate
+    ) -> tuple[ParsedHackerNewsJob, dict | None]:
+        fallback = parse_hacker_news_job(candidate)
+        evidence = next(
+            (
+                item
+                for item in candidate.evidence
+                if item.evidence_type == "ashby_job_posting"
+            ),
+            None,
+        )
+        if evidence is None:
+            return fallback, None
+        metadata = evidence.metadata_json or {}
+        title = evidence.title or fallback.title
+        description = metadata.get("description_plain") or evidence.excerpt or fallback.description
+        location = metadata.get("location") or fallback.location
+        job_url = metadata.get("job_url") or metadata.get("apply_url") or evidence.source_url
+        return (
+            ParsedHackerNewsJob(
+                title=title,
+                description=description,
+                location=location,
+                remote_type=_ashby_remote_type(metadata, fallback.remote_type),
+                role_category=role_category_for_title(title),
+                job_url=job_url,
+            ),
+            metadata,
+        )
+
     def _require_candidate(self, candidate_id: str) -> DiscoveryCandidate:
         candidate = self.candidate_repository.get_by_id(candidate_id)
         if candidate is None:
@@ -173,3 +214,23 @@ class DiscoveryJobIngestionService:
             message="Job already exists for discovery candidate",
             job=job,
         )
+
+
+def _ashby_remote_type(metadata: dict, fallback: RemoteType) -> RemoteType:
+    workplace = str(metadata.get("workplace_type") or "").lower()
+    if workplace in {"on-site", "onsite", "in-office"}:
+        return RemoteType.ONSITE
+    if workplace == "hybrid":
+        return RemoteType.HYBRID
+    if workplace == "remote" or metadata.get("is_remote") is True:
+        return RemoteType.REMOTE_WORLDWIDE
+    return fallback
+
+
+def _ashby_published_at(metadata: dict | None) -> datetime | None:
+    if not metadata or not isinstance(metadata.get("published_at"), str):
+        return None
+    try:
+        return datetime.fromisoformat(metadata["published_at"].replace("Z", "+00:00"))
+    except ValueError:
+        return None

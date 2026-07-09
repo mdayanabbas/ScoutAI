@@ -38,6 +38,15 @@ class Settings(BaseSettings):
     YC_COMPANY_REQUEST_TIMEOUT_SECONDS: int = Field(default=10, gt=0)
     YC_COMPANY_MAX_RETRIES: int = Field(default=2, ge=0)
     YC_COMPANY_USER_AGENT: str = "ScoutAI/0.1 YC-company-resolver"
+    ASHBY_RESOLVER_ENABLED: bool = True
+    ASHBY_POSTING_API_BASE_URL: str = (
+        "https://api.ashbyhq.com/posting-api/job-board"
+    )
+    ASHBY_REQUEST_TIMEOUT_SECONDS: int = Field(default=10, gt=0)
+    ASHBY_MAX_RETRIES: int = Field(default=2, ge=0)
+    ASHBY_MAX_RESPONSE_BYTES: int = Field(default=2_000_000, gt=0)
+    ASHBY_USER_AGENT: str = "ScoutAI/0.1 Ashby-public-job-resolver"
+    ASHBY_INCLUDE_COMPENSATION: bool = True
     DISCOVERY_JOB_INGESTION_MAX_CANDIDATES_PER_RUN: int = Field(default=100, gt=0)
 
     @model_validator(mode="after")

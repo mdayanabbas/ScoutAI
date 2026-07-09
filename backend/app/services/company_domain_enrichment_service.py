@@ -12,21 +12,25 @@ from app.enrichment.domain_extractor import (
 )
 from app.enrichment.domain_validator import DomainValidator, DomainValidationResult
 from app.enrichment.proposal_ranker import (
-    RankedDomainProposal,
     rank_domain_proposals,
     select_resolvable_proposal,
 )
 from app.enrichment.resolvers import (
+    AshbyCompanyResolutionResult,
+    AshbyJobBoardResolver,
+    AshbyJobBoardResult,
     YCCompanyResolutionResult,
     YCombinatorCompanyResolver,
 )
 from app.models.company_enrichment_attempt import CompanyEnrichmentAttempt
 from app.models.discovery_candidate import DiscoveryCandidate
+from app.models.discovery_evidence import DiscoveryEvidence
 from app.repositories.company_enrichment_attempt_repository import (
     CompanyEnrichmentAttemptRepository,
 )
 from app.repositories.company_repository import CompanyRepository
 from app.repositories.discovery_candidate_repository import DiscoveryCandidateRepository
+from app.repositories.discovery_evidence_repository import DiscoveryEvidenceRepository
 from app.repositories.discovery_run_repository import DiscoveryRunRepository
 from app.schemas.company_enrichment import (
     CandidateEnrichmentResult,
@@ -53,16 +57,20 @@ class CompanyDomainEnrichmentService:
         session: Session,
         validator: DomainValidator | None = None,
         yc_resolver: YCombinatorCompanyResolver | None = None,
+        ashby_resolver: AshbyJobBoardResolver | None = None,
     ) -> None:
         self.session = session
         self.candidate_repository = DiscoveryCandidateRepository(session)
         self.run_repository = DiscoveryRunRepository(session)
         self.attempt_repository = CompanyEnrichmentAttemptRepository(session)
+        self.evidence_repository = DiscoveryEvidenceRepository(session)
         self.company_repository = CompanyRepository(session)
         self.company_service = CompanyService(session)
         self.validator = validator or DomainValidator()
         self.yc_resolver = yc_resolver or YCombinatorCompanyResolver()
+        self.ashby_resolver = ashby_resolver or AshbyJobBoardResolver()
         self._yc_resolution_cache: dict[str, YCCompanyResolutionResult] = {}
+        self._ashby_board_cache: dict[str, AshbyJobBoardResult] = {}
 
     async def enrich_candidate(self, candidate_id: str) -> CandidateEnrichmentResult:
         candidate = self._require_candidate(candidate_id)
@@ -207,6 +215,11 @@ class CompanyDomainEnrichmentService:
             )
             if yc_result is not None:
                 return yc_result
+            ashby_result = await self._try_ashby_resolution(
+                candidate, attempt, evidence
+            )
+            if ashby_result is not None:
+                return ashby_result
             attempt = self.attempt_repository.mark_unresolved(
                 attempt, unresolved_reason or "no_domain_proposals", evidence
             )
@@ -346,6 +359,146 @@ class CompanyDomainEnrichmentService:
             CompanyEnrichmentResolver.YCOMBINATOR_PROFILE,
             result.confidence or 0.95,
             evidence,
+        )
+
+    async def _try_ashby_resolution(
+        self,
+        candidate: DiscoveryCandidate,
+        attempt: CompanyEnrichmentAttempt,
+        base_evidence: dict[str, Any],
+    ) -> CandidateEnrichmentResult | None:
+        if not self.ashby_resolver.supports(candidate):
+            return None
+        slug = self.ashby_resolver.extract_board_slug(candidate)
+        if not slug:
+            classification = (candidate.raw_payload or {}).get(
+                "url_classification"
+            ) or {}
+            reason = (
+                "ashby_board_slug_invalid"
+                if classification.get("external_company_slug")
+                else "ashby_board_slug_missing"
+            )
+            evidence = {**base_evidence, "ashby_job_board": {"reason": reason}}
+            self.attempt_repository.update(
+                attempt,
+                {
+                    "resolver": CompanyEnrichmentResolver.ASHBY_PUBLIC_JOB_BOARD,
+                    "reason": reason,
+                    "evidence_json": evidence,
+                },
+            )
+            self.attempt_repository.mark_unresolved(attempt, reason, evidence)
+            return self._result(
+                candidate, CompanyEnrichmentDecision.UNRESOLVED, None, reason
+            )
+
+        logger.info(
+            "Ashby resolver selected",
+            extra={"candidate_id": candidate.id, "board_slug": slug},
+        )
+        board = self._ashby_board_cache.get(slug.lower())
+        if board is None:
+            board = await self.ashby_resolver.fetch_job_board(slug)
+            self._ashby_board_cache[slug.lower()] = board
+        result = await self.ashby_resolver.resolve(candidate, board_result=board)
+        evidence = {
+            **base_evidence,
+            "ashby_job_board": {
+                "board_slug": result.board_slug,
+                "posting_id": result.posting_id,
+                "status_code": result.status_code,
+                "proposed_website_url": result.proposed_website_url,
+                "proposed_domain": result.proposed_domain,
+                "reason": result.reason,
+                **result.evidence,
+            },
+        }
+        self.attempt_repository.update(
+            attempt,
+            {
+                "resolver": CompanyEnrichmentResolver.ASHBY_PUBLIC_JOB_BOARD,
+                "proposed_website_url": result.proposed_website_url,
+                "proposed_domain": result.proposed_domain,
+                "confidence": result.confidence,
+                "reason": result.reason,
+                "evidence_json": evidence,
+            },
+        )
+        if result.matched_job is not None:
+            self._persist_ashby_evidence(candidate, result)
+
+        if not result.resolved or not result.proposed_website_url:
+            reason = result.reason or "ashby_company_domain_missing"
+            self.attempt_repository.mark_unresolved(attempt, reason, evidence)
+            logger.info(
+                "Ashby candidate remained unresolved",
+                extra={"candidate_id": candidate.id, "reason": reason},
+            )
+            return self._result(
+                candidate, CompanyEnrichmentDecision.UNRESOLVED, None, reason
+            )
+
+        validation = await self.validator.validate(result.proposed_website_url)
+        evidence["ashby_job_board"]["validation"] = validation.__dict__
+        if not validation.valid or not validation.normalized_domain:
+            reason = _ashby_validation_reason(validation.reason)
+            self.attempt_repository.mark_unresolved(attempt, reason, evidence)
+            return self._result(
+                candidate, CompanyEnrichmentDecision.UNRESOLVED, None, reason
+            )
+        logger.info(
+            "Ashby company domain resolved",
+            extra={
+                "candidate_id": candidate.id,
+                "domain": validation.normalized_domain,
+            },
+        )
+        return self._resolve_candidate_with_domain(
+            candidate,
+            attempt,
+            validation,
+            CompanyEnrichmentResolver.ASHBY_PUBLIC_JOB_BOARD,
+            result.confidence or 0.9,
+            evidence,
+        )
+
+    def _persist_ashby_evidence(
+        self,
+        candidate: DiscoveryCandidate,
+        result: AshbyCompanyResolutionResult,
+    ) -> None:
+        job = result.matched_job
+        if job is None:
+            return
+        identity = job.raw_posting_id or job.job_url or job.apply_url
+        for existing in candidate.evidence:
+            metadata = existing.metadata_json or {}
+            if (
+                existing.evidence_type == "ashby_job_posting"
+                and metadata.get("identity") == identity
+            ):
+                return
+        source_url = job.job_url or job.apply_url
+        if not source_url:
+            return
+        self.evidence_repository.create_evidence(
+            DiscoveryEvidence(
+                discovery_candidate_id=candidate.id,
+                evidence_type="ashby_job_posting",
+                source_url=source_url,
+                title=job.title,
+                excerpt=(job.description_plain or "")[:500] or None,
+                published_at=job.published_at,
+                metadata_json={
+                    "identity": identity,
+                    "resolver": (
+                        CompanyEnrichmentResolver.ASHBY_PUBLIC_JOB_BOARD.value
+                    ),
+                    "board_slug": result.board_slug,
+                    **job.focused_metadata(),
+                },
+            )
         )
 
     def _resolve_candidate_with_domain(
@@ -501,3 +654,17 @@ def _yc_validation_reason(reason: str | None) -> str:
     if reason in {"unreachable", "too_many_redirects"}:
         return "yc_profile_website_unreachable"
     return "yc_profile_website_unreachable"
+
+
+def _ashby_validation_reason(reason: str | None) -> str:
+    if reason in {
+        "unsafe_host",
+        "unsafe_redirect",
+        "unsafe_redirect_host",
+        "blocked_or_shared_domain",
+        "blocked_redirect_domain",
+        "invalid_hostname",
+        "embedded_credentials",
+    }:
+        return "ashby_company_domain_unsafe"
+    return "ashby_company_domain_unreachable"

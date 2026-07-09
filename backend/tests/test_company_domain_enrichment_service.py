@@ -3,7 +3,12 @@ from dataclasses import dataclass
 import pytest
 
 from app.enrichment.domain_validator import DomainValidationResult
-from app.enrichment.resolvers import YCCompanyResolutionResult
+from app.enrichment.ashby_public_job_parser import AshbyPublicJob
+from app.enrichment.resolvers import (
+    AshbyCompanyResolutionResult,
+    AshbyJobBoardResult,
+    YCCompanyResolutionResult,
+)
 from app.models.company import Company
 from app.models.discovery_candidate import DiscoveryCandidate
 from app.models.discovery_run import DiscoveryRun
@@ -29,6 +34,8 @@ class FakeValidator:
             if "getdexter" in value
             else "infracost.io"
             if "infracost" in value
+            else "supabase.com"
+            if "supabase" in value
             else "acme.ai"
         )
         return DomainValidationResult(
@@ -58,6 +65,69 @@ class FakeYCResolver:
     async def resolve(self, candidate):
         self.calls += 1
         return self.result
+
+
+class FakeAshbyResolver:
+    def __init__(self, resolved: bool = True):
+        self.resolved = resolved
+        self.fetch_calls = 0
+        self.job = AshbyPublicJob(
+            title="Software Engineer",
+            location="Remote",
+            secondary_locations=(),
+            department="Engineering",
+            team="Database",
+            is_listed=True,
+            is_remote=True,
+            workplace_type="Remote",
+            description_plain="Apply via careers@supabase.com",
+            description_html=None,
+            published_at=None,
+            employment_type="FullTime",
+            job_url=(
+                "https://jobs.ashbyhq.com/supabase/"
+                "2e718684-4f75-4a99-8d6b-3b6bd44e4228"
+            ),
+            apply_url=None,
+            compensation_summary="$150k-$200k",
+            raw_posting_id="2e718684-4f75-4a99-8d6b-3b6bd44e4228",
+        )
+
+    def supports(self, candidate):
+        classification = (candidate.raw_payload or {}).get("url_classification") or {}
+        return classification.get("platform") == "ashby"
+
+    def extract_board_slug(self, candidate):
+        return ((candidate.raw_payload or {}).get("url_classification") or {}).get(
+            "external_company_slug"
+        )
+
+    async def fetch_job_board(self, slug):
+        self.fetch_calls += 1
+        return AshbyJobBoardResult(True, slug, 200, (self.job,))
+
+    async def resolve(self, candidate, board_result=None):
+        if not self.resolved:
+            return AshbyCompanyResolutionResult(
+                False,
+                board_slug="supabase",
+                matched_job=self.job,
+                status_code=200,
+                reason="ashby_company_domain_missing",
+                evidence={"listed_job_count": 1},
+            )
+        return AshbyCompanyResolutionResult(
+            True,
+            board_slug="supabase",
+            posting_id=self.job.raw_posting_id,
+            matched_job=self.job,
+            proposed_website_url="supabase.com",
+            proposed_domain="supabase.com",
+            status_code=200,
+            confidence=1.0,
+            reason="ashby_company_domain_evidence",
+            evidence={"listed_job_count": 1},
+        )
 
 
 def _yc_resolution(
@@ -134,6 +204,30 @@ def _yc_candidate(db_session, source_identifier: str = "hn:yc"):
         },
         source_identifier=source_identifier,
         name="Infracost",
+    )
+
+
+def _ashby_candidate(db_session, source_identifier: str = "hn:ashby"):
+    url = (
+        "https://jobs.ashbyhq.com/supabase/"
+        "2e718684-4f75-4a99-8d6b-3b6bd44e4228"
+    )
+    return _deferred_candidate(
+        db_session,
+        text="Supabase is hiring a Software Engineer",
+        raw_payload={
+            "url": url,
+            "type": "job",
+            "feed": "jobs",
+            "title": "Supabase is hiring a Software Engineer",
+            "url_classification": {
+                "platform": "ashby",
+                "external_company_slug": "supabase",
+                "original_url": url,
+            },
+        },
+        source_identifier=source_identifier,
+        name="Supabase",
     )
 
 
@@ -282,4 +376,69 @@ async def test_yc_profile_result_reused_for_same_slug_in_run(db_session):
     assert result.companies_created == 1
     assert result.companies_matched == 1
     assert yc_resolver.calls == 1
+    assert service.company_repository.count_companies() == 1
+
+
+@pytest.mark.asyncio
+async def test_ashby_resolution_creates_company_attempt_and_focused_evidence(
+    db_session,
+):
+    candidate = _ashby_candidate(db_session)
+    resolver = FakeAshbyResolver()
+    service = CompanyDomainEnrichmentService(
+        db_session,
+        validator=FakeValidator(),
+        ashby_resolver=resolver,
+    )
+
+    result = await service.enrich_candidate(candidate.id)
+    repeated = await service.enrich_candidate(candidate.id)
+
+    assert result.decision == "created_company"
+    assert repeated.company_id == result.company_id
+    assert result.resolved_domain == "supabase.com"
+    assert result.candidate.deferred_reason is None
+    assert result.attempts[-1].resolver == "ashby_public_job_board"
+    evidence = service.evidence_repository.list_by_candidate(candidate.id)
+    assert [item.evidence_type for item in evidence] == ["ashby_job_posting"]
+    assert evidence[0].title == "Software Engineer"
+    assert service.company_repository.count_companies() == 1
+
+
+@pytest.mark.asyncio
+async def test_ashby_unresolved_candidate_stays_deferred(db_session):
+    candidate = _ashby_candidate(db_session)
+    service = CompanyDomainEnrichmentService(
+        db_session,
+        validator=FakeValidator(),
+        ashby_resolver=FakeAshbyResolver(resolved=False),
+    )
+
+    result = await service.enrich_candidate(candidate.id)
+
+    assert result.decision == "unresolved"
+    assert result.candidate.decision == DiscoveryDecision.DEFERRED
+    assert result.candidate.deferred_reason == "requires_company_domain_enrichment"
+    assert result.attempts[-1].reason == "ashby_company_domain_missing"
+
+
+@pytest.mark.asyncio
+async def test_ashby_board_response_reused_by_slug(db_session):
+    first = _ashby_candidate(db_session, "hn:ashby-1")
+    second = _ashby_candidate(db_session, "hn:ashby-2")
+    db_session.query(DiscoveryCandidate).filter(
+        DiscoveryCandidate.id == second.id
+    ).update({"discovery_run_id": first.discovery_run_id})
+    db_session.commit()
+    resolver = FakeAshbyResolver()
+    service = CompanyDomainEnrichmentService(
+        db_session,
+        validator=FakeValidator(),
+        ashby_resolver=resolver,
+    )
+
+    result = await service.enrich_discovery_run(first.discovery_run_id)
+
+    assert result.candidates_resolved == 2
+    assert resolver.fetch_calls == 1
     assert service.company_repository.count_companies() == 1
