@@ -7,6 +7,9 @@ from app.services.company_domain_enrichment_service import (
 from app.services.crawl_run_service import CrawlRunService
 from app.services.discovery_service import DiscoveryService
 from app.services.discovery_job_ingestion_service import DiscoveryJobIngestionService
+from app.services.job_batch_enrichment_service import JobBatchEnrichmentService
+from app.services.ashby_board_expansion_service import AshbyBoardExpansionService
+from app.services.job_detail_enrichment_service import JobDetailEnrichmentService
 from app.services.job_service import JobService
 from app.services.tech_stack_service import TechStackService
 from app.services.user_profile_service import UserProfileService
@@ -19,6 +22,9 @@ __all__ = [
     "CrawlRunService",
     "DiscoveryService",
     "DiscoveryJobIngestionService",
+    "JobBatchEnrichmentService",
+    "AshbyBoardExpansionService",
+    "JobDetailEnrichmentService",
     "JobService",
     "TechStackService",
     "UserProfileService",

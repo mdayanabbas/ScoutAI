@@ -117,16 +117,50 @@ class JobStatus(StrEnum):
     UNKNOWN = "unknown"
 
 
+class JobEnrichmentStatus(StrEnum):
+    NOT_ENRICHED = "not_enriched"
+    PENDING = "pending"
+    ENRICHED = "enriched"
+    PARTIALLY_ENRICHED = "partially_enriched"
+    UNRESOLVED = "unresolved"
+    FAILED = "failed"
+
+
+class JobEnrichmentAttemptStatus(StrEnum):
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    PARTIAL = "partial"
+    UNRESOLVED = "unresolved"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
+class JobSourceType(StrEnum):
+    YCOMBINATOR_JOB = "ycombinator_job"
+    ASHBY_JOB_BOARD = "ashby_job_board"
+    FIRST_PARTY_JOB_PAGE = "first_party_job_page"
+    GENERIC_EXTERNAL_JOB_PAGE = "generic_external_job_page"
+    UNSUPPORTED = "unsupported"
+    INVALID = "invalid"
+
+
 class RoleCategory(StrEnum):
     AI_ENGINEER = "ai_engineer"
     BACKEND_ENGINEER = "backend_engineer"
+    DEVELOPER_ADVOCATE = "developer_advocate"
+    FORWARD_DEPLOYED_ENGINEER = "forward_deployed_engineer"
+    INFRASTRUCTURE_ENGINEER = "infrastructure_engineer"
     SOFTWARE_ENGINEER = "software_engineer"
     ML_ENGINEER = "ml_engineer"
     DATA_ENGINEER = "data_engineer"
     FULL_STACK_ENGINEER = "full_stack_engineer"
     FRONTEND_ENGINEER = "frontend_engineer"
     DEVOPS_ENGINEER = "devops_engineer"
+    MARKETING = "marketing"
+    OPERATIONS = "operations"
     PRODUCT_ENGINEER = "product_engineer"
+    PRODUCT_MANAGER = "product_manager"
+    SALES = "sales"
     OTHER = "other"
 
 

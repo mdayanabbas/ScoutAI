@@ -61,7 +61,7 @@ async def test_create_company_job(jobs_api_client: AsyncClient):
     assert data["role_category"] == "ai_engineer"
     assert data["location"] == "Remote"
     assert data["remote_type"] == "remote_worldwide"
-    assert data["job_url"] == "jobs.example/senior-ai-engineer"
+    assert data["job_url"] == "https://jobs.example/senior-ai-engineer"
     assert data["status"] == "active"
 
 

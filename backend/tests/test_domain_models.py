@@ -8,6 +8,7 @@ EXPECTED_TABLES = {
     "companies",
     "company_pages",
     "jobs",
+    "job_enrichment_attempts",
     "tech_stack_items",
     "crawl_runs",
     "agent_runs",
