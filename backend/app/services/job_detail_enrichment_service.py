@@ -12,6 +12,10 @@ from app.jobs.enrichment.providers.ashby_job_provider import (
     PROVIDER_NAME as ASHBY_PROVIDER_NAME,
     AshbyJobEnrichmentProvider,
 )
+from app.jobs.enrichment.providers.first_party_job_provider import (
+    PROVIDER_NAME as FIRST_PARTY_PROVIDER_NAME,
+    FirstPartyJobEnrichmentProvider,
+)
 from app.jobs.enrichment.providers.ycombinator_job_provider import (
     PROVIDER_NAME,
     YCombinatorJobEnrichmentProvider,
@@ -53,6 +57,7 @@ class JobDetailEnrichmentService:
         source_detector: JobSourceDetector | None = None,
         yc_provider: YCombinatorJobEnrichmentProvider | None = None,
         ashby_provider: AshbyJobEnrichmentProvider | None = None,
+        first_party_provider: FirstPartyJobEnrichmentProvider | None = None,
     ) -> None:
         self.session = session
         self.job_repository = JobRepository(session)
@@ -60,6 +65,7 @@ class JobDetailEnrichmentService:
         self.source_detector = source_detector or JobSourceDetector()
         self.yc_provider = yc_provider or YCombinatorJobEnrichmentProvider()
         self.ashby_provider = ashby_provider or AshbyJobEnrichmentProvider()
+        self.first_party_provider = first_party_provider or FirstPartyJobEnrichmentProvider()
 
     async def enrich_job(self, job_id: str) -> JobEnrichmentResult:
         job = self.job_repository.get_by_id(job_id)
@@ -79,6 +85,10 @@ class JobDetailEnrichmentService:
             provider_name = ASHBY_PROVIDER_NAME
             provider = self.ashby_provider
             provider_label = "Ashby"
+        elif detection.source_type == JobSourceType.FIRST_PARTY_JOB_PAGE and detection.canonical_url:
+            provider_name = FIRST_PARTY_PROVIDER_NAME
+            provider = self.first_party_provider
+            provider_label = "First-party"
         else:
             return JobEnrichmentResult(
                 job_id=job.id,
@@ -100,7 +110,7 @@ class JobDetailEnrichmentService:
             )
         )
         try:
-            if provider_name == ASHBY_PROVIDER_NAME:
+            if provider_name in {ASHBY_PROVIDER_NAME, FIRST_PARTY_PROVIDER_NAME}:
                 parsed = await provider.enrich(detection, job=job)
             else:
                 parsed = await provider.enrich(detection)
@@ -213,7 +223,7 @@ class JobDetailEnrichmentService:
                 "failed",
                 provider_name,
                 completed.id,
-                "ashby_update_failed" if provider_name == ASHBY_PROVIDER_NAME else "yc_job_update_failed",
+                _update_failed_reason(provider_name),
                 detection.source_type.value,
                 detection.canonical_url,
                 detection.canonical_url,
@@ -231,7 +241,18 @@ UNRESOLVED_REASONS = {
     "no_matching_ashby_job",
     "ashby_board_requires_job_matching",
     "ashby_job_data_missing",
+    "first_party_listing_page_requires_expansion",
+    "first_party_company_identity_mismatch",
+    "first_party_job_data_missing",
 }
+
+
+def _update_failed_reason(provider_name: str) -> str:
+    if provider_name == ASHBY_PROVIDER_NAME:
+        return "ashby_update_failed"
+    if provider_name == FIRST_PARTY_PROVIDER_NAME:
+        return "first_party_update_failed"
+    return "yc_job_update_failed"
 
 
 def _build_safe_updates(

@@ -114,6 +114,32 @@ def _ashby_parsed(title="Backend Engineer", *, success=True, reason="exact_ashby
     )
 
 
+def _first_party_parsed(title="Backend Engineer", *, success=True, reason="first_party_job_page_enriched"):
+    url = "https://first-party.example/careers/backend-engineer"
+    return JobDetailExtractionResult(
+        success=success,
+        provider="first_party_job_page",
+        source_url=url,
+        canonical_url=url,
+        title=JobFieldValue(title, 1.0, "jobposting_title"),
+        description=JobFieldValue("Build first-party systems. " * 20, 0.95, "jobposting_description"),
+        role_category=JobFieldValue("backend_engineer", 0.95, "classifier"),
+        location=JobFieldValue("Remote", 0.9, "location"),
+        remote_type=JobFieldValue("remote_worldwide", 0.9, "location"),
+        employment_type=JobFieldValue("full_time", 0.95, "employment_type"),
+        job_url=JobFieldValue(url, 0.95, "canonical_first_party_url"),
+        field_confidence={
+            "title": 1.0,
+            "description": 0.95,
+            "role_category": 0.95,
+            "location": 0.9,
+            "employment_type": 0.95,
+        },
+        evidence={"strategy": "first_party_test", "overall_confidence": 0.96},
+        reason=reason,
+    )
+
+
 @pytest.mark.asyncio
 async def test_service_enriches_yc_job_and_marks_attempt_succeeded(db_session):
     job = _job(db_session, title="Open Roles")
@@ -244,6 +270,88 @@ async def test_service_marks_ashby_ambiguity_unresolved_and_leaves_job_unchanged
     assert updated.title == "GTM Team"
     assert updated.job_url == "https://jobs.ashbyhq.com/lago"
     assert attempts[0].status == "unresolved"
+
+
+@pytest.mark.asyncio
+async def test_service_enriches_first_party_job_and_preserves_provenance(db_session):
+    token = uuid4().hex[:8]
+    domain = f"first-party-{token}.example"
+    company = CompanyRepository(db_session).create_company(
+        Company(
+            name=f"First Party {token}",
+            normalized_domain=domain,
+            website_url=f"https://{domain}",
+        )
+    )
+    job = JobRepository(db_session).create_job(
+        Job(
+            company_id=company.id,
+            title="Open Roles",
+            normalized_title="open roles",
+            description="We are hiring.",
+            job_url=f"https://{domain}/careers/backend-engineer",
+            source_platform="hacker_news",
+            status=JobStatus.ACTIVE,
+            first_seen_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        )
+    )
+    original_company_id = job.company_id
+    original_candidate_id = job.discovery_candidate_id
+    original_first_seen_at = job.first_seen_at
+
+    result = await JobDetailEnrichmentService(
+        db_session,
+        first_party_provider=FakeProvider(_first_party_parsed()),
+    ).enrich_job(job.id)
+
+    updated = JobRepository(db_session).get_by_id(job.id)
+    attempts = JobEnrichmentAttemptRepository(db_session).list_by_job_id(job.id)
+    assert result.status == "enriched"
+    assert result.provider == "first_party_job_page"
+    assert updated.title == "Backend Engineer"
+    assert updated.description.startswith("Build first-party")
+    assert updated.company_id == original_company_id
+    assert updated.discovery_candidate_id == original_candidate_id
+    assert updated.first_seen_at == original_first_seen_at
+    assert updated.last_verified_at is not None
+    assert updated.enriched_at is not None
+    assert attempts[0].provider == "first_party_job_page"
+    assert "raw_html" not in str(attempts[0].evidence_json)
+
+
+@pytest.mark.asyncio
+async def test_service_first_party_listing_page_unresolved_leaves_job_unchanged(db_session):
+    token = uuid4().hex[:8]
+    domain = f"first-party-{token}.example"
+    company = CompanyRepository(db_session).create_company(
+        Company(
+            name=f"First Party {token}",
+            normalized_domain=domain,
+            website_url=f"https://{domain}",
+        )
+    )
+    job = JobRepository(db_session).create_job(
+        Job(
+            company_id=company.id,
+            title="Open Roles",
+            normalized_title="open roles",
+            description="Short HN sentence.",
+            job_url=f"https://{domain}/careers",
+            source_platform="hacker_news",
+            status=JobStatus.ACTIVE,
+        )
+    )
+    unresolved = _first_party_parsed(success=False, reason="first_party_listing_page_requires_expansion")
+
+    result = await JobDetailEnrichmentService(
+        db_session,
+        first_party_provider=FakeProvider(unresolved),
+    ).enrich_job(job.id)
+
+    updated = JobRepository(db_session).get_by_id(job.id)
+    assert result.status == "unresolved"
+    assert updated.title == "Open Roles"
+    assert updated.description == "Short HN sentence."
 
 
 @pytest.mark.asyncio

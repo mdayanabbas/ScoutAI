@@ -207,15 +207,16 @@ async def test_delay_occurs_only_between_provider_backed_jobs(monkeypatch, db_se
 async def test_yc_and_ashby_jobs_process_in_one_batch(db_session):
     yc = _job(db_session, title="YC")
     ashby = _job(db_session, title="Ashby", job_url="https://jobs.ashbyhq.com/lago/backend")
+    first_party = _job(db_session, title="First Party", job_url="https://batch.example/careers/backend")
     unsupported = _job(db_session, title="Unsupported", job_url="https://jobs.example.com/acme")
     fake = FakeDetailService(db_session, statuses={unsupported.id: "skipped"})
 
     result = await JobBatchEnrichmentService(db_session, detail_service=fake).enrich_jobs(
         limit=10,
-        job_ids=[yc.id, ashby.id, unsupported.id],
+        job_ids=[yc.id, ashby.id, first_party.id, unsupported.id],
     )
 
-    assert [item.job_id for item in result.results] == [yc.id, ashby.id, unsupported.id]
-    assert result.jobs_enriched == 2
+    assert [item.job_id for item in result.results] == [yc.id, ashby.id, first_party.id, unsupported.id]
+    assert result.jobs_enriched == 3
     assert result.jobs_skipped == 1
-    assert JobRepository(db_session).count_jobs() == 3
+    assert JobRepository(db_session).count_jobs() == 4
