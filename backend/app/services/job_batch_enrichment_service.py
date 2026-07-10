@@ -238,7 +238,10 @@ class JobBatchEnrichmentService:
             company_domain=company_domain,
             source_platform=job.source_platform,
         )
-        return detection.source_type == JobSourceType.YCOMBINATOR_JOB
+        return detection.source_type in {
+            JobSourceType.YCOMBINATOR_JOB,
+            JobSourceType.ASHBY_JOB_BOARD,
+        }
 
 
 def _dedupe(values: list[str]) -> list[str]:

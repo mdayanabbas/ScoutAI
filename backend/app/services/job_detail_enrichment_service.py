@@ -8,11 +8,15 @@ from sqlalchemy.orm import Session
 from app.core.errors import NotFoundError
 from app.jobs.enrichment.models import JobDetailExtractionResult, JobFieldValue
 from app.jobs.enrichment.parsers.ycombinator_job_parser import is_generic_job_title
+from app.jobs.enrichment.providers.ashby_job_provider import (
+    PROVIDER_NAME as ASHBY_PROVIDER_NAME,
+    AshbyJobEnrichmentProvider,
+)
 from app.jobs.enrichment.providers.ycombinator_job_provider import (
     PROVIDER_NAME,
     YCombinatorJobEnrichmentProvider,
 )
-from app.jobs.job_source_detector import JobSourceDetector
+from app.jobs.job_source_detector import JobSourceDetector, parse_ashby_job_url
 from app.models.job import Job
 from app.models.job_enrichment_attempt import JobEnrichmentAttempt
 from app.repositories.job_enrichment_attempt_repository import (
@@ -48,12 +52,14 @@ class JobDetailEnrichmentService:
         *,
         source_detector: JobSourceDetector | None = None,
         yc_provider: YCombinatorJobEnrichmentProvider | None = None,
+        ashby_provider: AshbyJobEnrichmentProvider | None = None,
     ) -> None:
         self.session = session
         self.job_repository = JobRepository(session)
         self.attempt_repository = JobEnrichmentAttemptRepository(session)
         self.source_detector = source_detector or JobSourceDetector()
         self.yc_provider = yc_provider or YCombinatorJobEnrichmentProvider()
+        self.ashby_provider = ashby_provider or AshbyJobEnrichmentProvider()
 
     async def enrich_job(self, job_id: str) -> JobEnrichmentResult:
         job = self.job_repository.get_by_id(job_id)
@@ -65,7 +71,15 @@ class JobDetailEnrichmentService:
             company_domain=company_domain,
             source_platform=job.source_platform,
         )
-        if detection.source_type != JobSourceType.YCOMBINATOR_JOB or not detection.canonical_url:
+        if detection.source_type == JobSourceType.YCOMBINATOR_JOB and detection.canonical_url:
+            provider_name = PROVIDER_NAME
+            provider = self.yc_provider
+            provider_label = "YC"
+        elif detection.source_type == JobSourceType.ASHBY_JOB_BOARD and detection.canonical_url:
+            provider_name = ASHBY_PROVIDER_NAME
+            provider = self.ashby_provider
+            provider_label = "Ashby"
+        else:
             return JobEnrichmentResult(
                 job_id=job.id,
                 status="skipped",
@@ -75,25 +89,24 @@ class JobDetailEnrichmentService:
                 canonical_url=detection.canonical_url,
             )
 
-        logger.info("YC enrichment started", extra={"job_id": job.id})
+        logger.info(f"{provider_label} enrichment started", extra={"job_id": job.id})
         attempt = self.attempt_repository.create_attempt(
             JobEnrichmentAttempt(
                 job_id=job.id,
-                provider=PROVIDER_NAME,
+                provider=provider_name,
                 status="running",
                 source_url=detection.canonical_url,
                 started_at=datetime.now(timezone.utc),
             )
         )
         try:
-            parsed = await self.yc_provider.enrich(detection)
+            if provider_name == ASHBY_PROVIDER_NAME:
+                parsed = await provider.enrich(detection, job=job)
+            else:
+                parsed = await provider.enrich(detection)
             if not parsed.success:
                 evidence = _bounded_evidence(parsed, {}, {})
-                if parsed.reason in {
-                    "yc_job_data_missing",
-                    "yc_job_invalid_html",
-                    "yc_job_parser_error",
-                }:
+                if parsed.reason in UNRESOLVED_REASONS:
                     self.job_repository.update_enrichment_fields(
                         job.id,
                         {
@@ -109,7 +122,7 @@ class JobDetailEnrichmentService:
                     return JobEnrichmentResult(
                         job.id,
                         "unresolved",
-                        PROVIDER_NAME,
+                        provider_name,
                         completed.id,
                         parsed.reason,
                         detection.source_type.value,
@@ -126,7 +139,7 @@ class JobDetailEnrichmentService:
                 return JobEnrichmentResult(
                     job.id,
                     "failed",
-                    PROVIDER_NAME,
+                    provider_name,
                     completed.id,
                     parsed.reason,
                     detection.source_type.value,
@@ -154,7 +167,7 @@ class JobDetailEnrichmentService:
                     field_confidence=parsed.field_confidence,
                 )
                 logger.info(
-                    "YC enrichment succeeded",
+                    f"{provider_label} enrichment succeeded",
                     extra={"job_id": job.id, "updated_fields": sorted(updates)},
                 )
             else:
@@ -166,13 +179,13 @@ class JobDetailEnrichmentService:
                     field_confidence=parsed.field_confidence,
                 )
                 logger.info(
-                    "YC enrichment partial",
+                    f"{provider_label} enrichment partial",
                     extra={"job_id": job.id, "updated_fields": sorted(updates)},
                 )
             return JobEnrichmentResult(
                 job_id=updated_job.id,
                 status=status,
-                provider=PROVIDER_NAME,
+                provider=provider_name,
                 attempt_id=completed.id,
                 reason=parsed.reason,
                 source_type=detection.source_type.value,
@@ -186,7 +199,7 @@ class JobDetailEnrichmentService:
         except Exception as exc:
             self.session.rollback()
             logger.info(
-                "YC enrichment failed",
+                f"{provider_label} enrichment failed",
                 extra={"job_id": job.id, "error": exc.__class__.__name__},
             )
             attempt = self.attempt_repository.get_by_id(attempt.id) or attempt
@@ -198,13 +211,27 @@ class JobDetailEnrichmentService:
             return JobEnrichmentResult(
                 job.id,
                 "failed",
-                PROVIDER_NAME,
+                provider_name,
                 completed.id,
-                "yc_job_update_failed",
+                "ashby_update_failed" if provider_name == ASHBY_PROVIDER_NAME else "yc_job_update_failed",
                 detection.source_type.value,
                 detection.canonical_url,
                 detection.canonical_url,
             )
+
+
+UNRESOLVED_REASONS = {
+    "yc_job_data_missing",
+    "yc_job_invalid_html",
+    "yc_job_parser_error",
+    "ashby_no_published_jobs",
+    "ashby_posting_not_found",
+    "ambiguous_ashby_posting_match",
+    "ambiguous_ashby_job_matches",
+    "no_matching_ashby_job",
+    "ashby_board_requires_job_matching",
+    "ashby_job_data_missing",
+}
 
 
 def _build_safe_updates(
@@ -242,6 +269,21 @@ def _build_safe_updates(
             updates["description"] = new_description
         else:
             preserved["description"] = "existing_description_richer_or_equal"
+
+    if parsed.job_url and parsed.job_url.confidence >= 0.9:
+        current_ashby = parse_ashby_job_url(job.job_url)
+        parsed_ashby = parse_ashby_job_url(parsed.job_url.value)
+        if (
+            current_ashby
+            and current_ashby.board_level
+            and parsed_ashby
+            and parsed_ashby.exact_posting
+        ):
+            updates["job_url"] = parsed_ashby.canonical_url
+        elif current_ashby and current_ashby.exact_posting:
+            preserved["job_url"] = "existing_exact_posting_url_preserved"
+        elif parsed_ashby:
+            preserved["job_url"] = "existing_non_board_url_preserved"
 
     if parsed.role_category and parsed.role_category.confidence >= 0.9:
         updates["role_category"] = parsed.role_category.value

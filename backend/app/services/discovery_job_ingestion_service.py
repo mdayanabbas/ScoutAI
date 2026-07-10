@@ -49,10 +49,6 @@ class DiscoveryJobIngestionService:
         if not self._is_resolved_candidate(candidate):
             return self._skipped(candidate, "Candidate does not have a resolved company")
 
-        link = self.job_link_repository.get_by_candidate_id(candidate.id)
-        if link is not None:
-            return self._already_exists(candidate, link.job)
-
         existing = self.job_repository.get_by_discovery_candidate_id(candidate.id)
         if existing is not None:
             self._ensure_job_link(existing, candidate)

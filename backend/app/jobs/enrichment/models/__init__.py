@@ -31,6 +31,7 @@ class JobDetailExtractionResult:
     salary_currency: JobFieldValue | None = None
     salary_text: JobFieldValue | None = None
     equity_mentioned: JobFieldValue | None = None
+    job_url: JobFieldValue | None = None
     apply_url: JobFieldValue | None = None
     visa_sponsorship: JobFieldValue | None = None
     work_authorization: JobFieldValue | None = None
@@ -61,6 +62,7 @@ class JobDetailExtractionResult:
             "salary_currency",
             "salary_text",
             "equity_mentioned",
+            "job_url",
             "apply_url",
             "visa_sponsorship",
             "work_authorization",

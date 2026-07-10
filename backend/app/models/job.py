@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from app.models.company import Company
     from app.models.discovery_candidate import DiscoveryCandidate
     from app.models.job_enrichment_attempt import JobEnrichmentAttempt
+    from app.models.job_board_expansion_link import JobBoardExpansionLink
     from app.models.job_discovery_link import JobDiscoveryLink
 
 
@@ -108,6 +109,18 @@ class Job(Base, UUIDMixin, TimestampMixin):
     )
     enrichment_attempts: Mapped[list["JobEnrichmentAttempt"]] = relationship(
         back_populates="job",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    expanded_child_links: Mapped[list["JobBoardExpansionLink"]] = relationship(
+        foreign_keys="JobBoardExpansionLink.parent_job_id",
+        back_populates="parent_job",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    expanded_parent_links: Mapped[list["JobBoardExpansionLink"]] = relationship(
+        foreign_keys="JobBoardExpansionLink.child_job_id",
+        back_populates="child_job",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
