@@ -241,6 +241,7 @@ class JobBatchEnrichmentService:
         return detection.source_type in {
             JobSourceType.YCOMBINATOR_JOB,
             JobSourceType.ASHBY_JOB_BOARD,
+            JobSourceType.FIRST_PARTY_JOB_PAGE,
         }
 
 

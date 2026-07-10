@@ -23,6 +23,11 @@ GENERIC_TITLES = {
     "gtm team",
     "software roles",
     "engineering roles",
+    "careers",
+    "jobs",
+    "join our team",
+    "current openings",
+    "open positions",
 }
 CURRENCY_SYMBOLS = {"$": "USD", "€": "EUR", "£": "GBP"}
 SENSITIVE_QUERY_RE = re.compile(r"(token|session|continue|auth|code|state)", re.IGNORECASE)
