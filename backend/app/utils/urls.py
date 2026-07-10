@@ -7,9 +7,17 @@ def normalize_url(url: str) -> str:
         return ""
 
     parsed = urlparse(value if "://" in value else f"//{value}")
-    domain = (parsed.netloc or parsed.path.split("/", 1)[0]).lower()
-    if domain.startswith("www."):
-        domain = domain[4:]
+    host = (parsed.hostname or parsed.netloc or parsed.path.split("/", 1)[0]).lower()
+    if host.startswith("www."):
+        host = host[4:]
+    port = ""
+    if parsed.port and not (
+        (parsed.scheme == "http" and parsed.port == 80)
+        or (parsed.scheme == "https" and parsed.port == 443)
+        or (not parsed.scheme and parsed.port in {80, 443})
+    ):
+        port = f":{parsed.port}"
+    domain = f"{host}{port}"
 
     path = parsed.path if parsed.netloc else ""
     normalized = f"{domain}{path}".rstrip("/")

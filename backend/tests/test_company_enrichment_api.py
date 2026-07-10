@@ -7,6 +7,7 @@ from app.enrichment.ashby_public_job_parser import AshbyPublicJob
 from app.enrichment.resolvers import (
     AshbyCompanyResolutionResult,
     AshbyJobBoardResult,
+    WebSearchCompanyResolutionResult,
     YCCompanyResolutionResult,
 )
 from app.models.discovery_candidate import DiscoveryCandidate
@@ -98,6 +99,23 @@ class FakeAshbyResolver:
             confidence=0.9,
             evidence={"listed_job_count": 1},
             reason="ashby_company_domain_evidence",
+        )
+
+
+class FakeWebSearchResolver:
+    def supports(self, candidate):
+        return True
+
+    async def resolve(self, candidate):
+        return WebSearchCompanyResolutionResult(
+            True,
+            proposed_website_url="https://supabase.com",
+            proposed_domain="supabase.com",
+            confidence=0.95,
+            provider="fake",
+            queries=('"Supabase" official website company',),
+            reason="web_search_company_identity_resolved",
+            evidence={"selected_domain": "supabase.com"},
         )
 
 
@@ -254,3 +272,61 @@ async def test_run_enrichment_automatically_resolves_ashby_candidate(
     assert data["results"][0]["attempts"][-1]["resolver"] == (
         "ashby_public_job_board"
     )
+
+
+@pytest.mark.asyncio
+async def test_run_enrichment_resolves_with_web_search_fallback(app, db_session):
+    run = DiscoveryRun(
+        source=DiscoverySource.HACKER_NEWS,
+        status=DiscoveryRunStatus.SUCCESS,
+        candidates_found=1,
+        candidates_normalized=1,
+        companies_created=0,
+        companies_matched=0,
+        candidates_deferred=1,
+        candidates_rejected=0,
+        candidates_failed=0,
+    )
+    db_session.add(run)
+    db_session.commit()
+    db_session.refresh(run)
+    db_session.add(
+        DiscoveryCandidate(
+            discovery_run_id=run.id,
+            source=DiscoverySource.HACKER_NEWS,
+            source_identifier="hn:web",
+            raw_name="Supabase",
+            raw_description="Supabase is hiring",
+            normalized_name="Supabase",
+            normalized_description="Supabase is hiring",
+            status=DiscoveryCandidateStatus.NORMALIZED,
+            decision=DiscoveryDecision.DEFERRED,
+            deferred_reason="requires_company_domain_enrichment",
+            raw_payload={"title": "Supabase is hiring a Software Engineer"},
+        )
+    )
+    db_session.commit()
+
+    def override_get_db():
+        yield db_session
+
+    def override_service():
+        return CompanyDomainEnrichmentService(
+            db_session,
+            validator=FakeValidator(),
+            yc_resolver=FakeYCResolver(),
+            ashby_resolver=FakeAshbyResolver(),
+            web_search_resolver=FakeWebSearchResolver(),
+        )
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_company_domain_enrichment_service] = override_service
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(f"/api/v1/discovery/runs/{run.id}/enrich-domains")
+    app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["candidates_resolved"] == 1
+    assert data["results"][0]["attempts"][-1]["resolver"] == "web_search_company_identity"

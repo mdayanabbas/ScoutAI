@@ -1,0 +1,10 @@
+# Local discovery outputs
+recent_jobs_run.json
+new_hn_run.json
+tavily_enrichment.json
+search_enrichment.json
+latest_ashby_enrichment.json
+
+# Any generated run output
+*_run.json
+*_enrichment.json
