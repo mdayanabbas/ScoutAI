@@ -64,7 +64,22 @@ from app.schemas.discovery_job_ingestion import (
     DiscoveryJobIngestionResult,
     DiscoveryRunJobIngestionResult,
 )
-from app.schemas.job import JobBase, JobCreate, JobListItem, JobRead, JobUpdate
+from app.schemas.job import (
+    JobBase,
+    JobBatchEnrichmentItemRead,
+    JobBatchEnrichmentRead,
+    JobBatchEnrichmentRequest,
+    AshbyBoardExpansionCandidateRead,
+    AshbyBoardExpansionRead,
+    JobCreate,
+    JobEnrichmentAttemptListRead,
+    JobEnrichmentAttemptRead,
+    JobEnrichmentRunRead,
+    JobListItem,
+    JobRead,
+    JobUpdate,
+)
+from app.schemas.job_source import JobSourceDetectionRead
 from app.schemas.tech_stack_item import (
     TechStackItemBase,
     TechStackItemCreate,
@@ -119,9 +134,18 @@ __all__ = [
     "ErrorBody",
     "ErrorResponse",
     "JobBase",
+    "JobBatchEnrichmentItemRead",
+    "JobBatchEnrichmentRead",
+    "JobBatchEnrichmentRequest",
+    "AshbyBoardExpansionCandidateRead",
+    "AshbyBoardExpansionRead",
     "JobCreate",
+    "JobEnrichmentAttemptListRead",
+    "JobEnrichmentAttemptRead",
+    "JobEnrichmentRunRead",
     "JobListItem",
     "JobRead",
+    "JobSourceDetectionRead",
     "JobUpdate",
     "MessageResponse",
     "ManualCompanyDomainInput",

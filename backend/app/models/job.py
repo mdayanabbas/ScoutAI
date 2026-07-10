@@ -4,8 +4,11 @@ from typing import TYPE_CHECKING
 from sqlalchemy import (
     DateTime,
     Enum,
+    Boolean,
+    Float,
     ForeignKey,
     Integer,
+    JSON,
     Numeric,
     String,
     Text,
@@ -20,6 +23,8 @@ if TYPE_CHECKING:
     from app.models.agent_run import AgentRun
     from app.models.company import Company
     from app.models.discovery_candidate import DiscoveryCandidate
+    from app.models.job_enrichment_attempt import JobEnrichmentAttempt
+    from app.models.job_board_expansion_link import JobBoardExpansionLink
     from app.models.job_discovery_link import JobDiscoveryLink
 
 
@@ -41,6 +46,7 @@ class Job(Base, UUIDMixin, TimestampMixin):
             RoleCategory,
             name="rolecategory",
             native_enum=False,
+            length=64,
             values_callable=lambda x: [e.value for e in x],
         ),
         default=RoleCategory.OTHER,
@@ -76,11 +82,45 @@ class Job(Base, UUIDMixin, TimestampMixin):
     )
     first_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    seniority: Mapped[str | None] = mapped_column(String(64))
+    employment_type: Mapped[str | None] = mapped_column(String(64))
+    apply_url: Mapped[str | None] = mapped_column(Text)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    salary_text: Mapped[str | None] = mapped_column(Text)
+    equity_mentioned: Mapped[bool | None] = mapped_column(Boolean)
+    visa_sponsorship: Mapped[str | None] = mapped_column(String(64))
+    work_authorization: Mapped[str | None] = mapped_column(Text)
+    required_skills_json: Mapped[list[str] | None] = mapped_column(JSON)
+    preferred_skills_json: Mapped[list[str] | None] = mapped_column(JSON)
+    technologies_json: Mapped[list[str] | None] = mapped_column(JSON)
+    enrichment_status: Mapped[str] = mapped_column(
+        String(32), default="not_enriched", nullable=False, index=True
+    )
+    enrichment_confidence: Mapped[float | None] = mapped_column(Float)
+    enriched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     company: Mapped["Company"] = relationship(back_populates="jobs")
     discovery_candidate: Mapped["DiscoveryCandidate | None"] = relationship()
     discovery_links: Mapped[list["JobDiscoveryLink"]] = relationship(
         back_populates="job",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    enrichment_attempts: Mapped[list["JobEnrichmentAttempt"]] = relationship(
+        back_populates="job",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    expanded_child_links: Mapped[list["JobBoardExpansionLink"]] = relationship(
+        foreign_keys="JobBoardExpansionLink.parent_job_id",
+        back_populates="parent_job",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    expanded_parent_links: Mapped[list["JobBoardExpansionLink"]] = relationship(
+        foreign_keys="JobBoardExpansionLink.child_job_id",
+        back_populates="child_job",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )

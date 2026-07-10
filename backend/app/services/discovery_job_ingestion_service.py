@@ -11,6 +11,7 @@ from app.discovery.hacker_news_job_parser import (
     parse_hacker_news_job,
     role_category_for_title,
 )
+from app.jobs.job_source_detector import JobSourceDetector
 from app.models.discovery_candidate import DiscoveryCandidate
 from app.models.job import Job
 from app.repositories.discovery_candidate_repository import DiscoveryCandidateRepository
@@ -28,7 +29,6 @@ from app.utils.enums import (
     RemoteType,
 )
 from app.utils.text import normalize_title
-from app.utils.urls import normalize_url
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +40,7 @@ class DiscoveryJobIngestionService:
         self.run_repository = DiscoveryRunRepository(session)
         self.job_repository = JobRepository(session)
         self.job_link_repository = JobDiscoveryLinkRepository(session)
+        self.source_detector = JobSourceDetector()
 
     def ingest_candidate(self, candidate_id: str) -> DiscoveryJobIngestionResult:
         candidate = self._require_candidate(candidate_id)
@@ -48,17 +49,16 @@ class DiscoveryJobIngestionService:
         if not self._is_resolved_candidate(candidate):
             return self._skipped(candidate, "Candidate does not have a resolved company")
 
-        link = self.job_link_repository.get_by_candidate_id(candidate.id)
-        if link is not None:
-            return self._already_exists(candidate, link.job)
-
         existing = self.job_repository.get_by_discovery_candidate_id(candidate.id)
         if existing is not None:
             self._ensure_job_link(existing, candidate)
             return self._already_exists(candidate, existing)
 
         parsed, ashby_metadata = self._parse_job(candidate)
-        normalized_job_url = normalize_url(parsed.job_url)
+        detected_source = self.source_detector.detect(parsed.job_url)
+        normalized_job_url = (
+            detected_source.canonical_url if detected_source.canonical_url else parsed.job_url
+        )
         normalized_job_title = normalize_title(parsed.title) or parsed.title.lower()
         canonical = self.job_repository.get_legacy_match(
             candidate.matched_company_id,
@@ -96,6 +96,7 @@ class DiscoveryJobIngestionService:
                 remote_type=parsed.remote_type,
                 role_category=parsed.role_category,
                 job_url=normalized_job_url,
+                apply_url=self._normalized_optional_url((ashby_metadata or {}).get("apply_url")),
                 source_platform="ashby" if ashby_metadata else "hacker_news",
                 status=JobStatus.ACTIVE,
                 first_seen_at=_ashby_published_at(ashby_metadata) or now,
@@ -233,6 +234,12 @@ class DiscoveryJobIngestionService:
 
     def _ensure_job_link(self, job: Job, candidate: DiscoveryCandidate) -> None:
         self.job_link_repository.ensure_link(job.id, candidate.id)
+
+    def _normalized_optional_url(self, value: str | None) -> str | None:
+        if not value:
+            return None
+        detection = self.source_detector.detect(value)
+        return detection.canonical_url if detection.canonical_url else value
 
 
 def _ashby_remote_type(metadata: dict, fallback: RemoteType) -> RemoteType:

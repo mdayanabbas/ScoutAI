@@ -8,6 +8,8 @@ from app.models.discovery_candidate import DiscoveryCandidate
 from app.models.discovery_evidence import DiscoveryEvidence
 from app.models.discovery_run import DiscoveryRun
 from app.models.job import Job
+from app.models.job_board_expansion_link import JobBoardExpansionLink
+from app.models.job_enrichment_attempt import JobEnrichmentAttempt
 from app.models.job_discovery_link import JobDiscoveryLink
 from app.models.tech_stack_item import TechStackItem
 from app.models.user_profile import UserProfile
@@ -23,6 +25,8 @@ __all__ = [
     "DiscoveryEvidence",
     "DiscoveryRun",
     "Job",
+    "JobBoardExpansionLink",
+    "JobEnrichmentAttempt",
     "JobDiscoveryLink",
     "TechStackItem",
     "UserProfile",
