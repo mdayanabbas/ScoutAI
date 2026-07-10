@@ -145,6 +145,20 @@ class JobEnrichmentAttemptRepository(BaseRepository[JobEnrichmentAttempt]):
             error_message=_safe_error_message(error_message),
         )
 
+    def mark_skipped(
+        self,
+        attempt: JobEnrichmentAttempt,
+        *,
+        reason: str | None = None,
+        evidence: dict[str, Any] | None = None,
+    ) -> JobEnrichmentAttempt:
+        return self._complete(
+            attempt,
+            JobEnrichmentAttemptStatus.SKIPPED,
+            reason=reason,
+            evidence=evidence,
+        )
+
     def _complete(
         self,
         attempt: JobEnrichmentAttempt,

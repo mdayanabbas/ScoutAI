@@ -18,10 +18,6 @@ class JobDiscoveryLink(Base, UUIDMixin, TimestampMixin):
             "discovery_candidate_id",
             name="uq_job_discovery_links_job_candidate",
         ),
-        UniqueConstraint(
-            "discovery_candidate_id",
-            name="uq_job_discovery_links_candidate",
-        ),
         Index("ix_job_discovery_links_job_id", "job_id"),
         Index("ix_job_discovery_links_discovery_candidate_id", "discovery_candidate_id"),
         Index("ix_job_discovery_links_created_at", "created_at"),

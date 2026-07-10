@@ -28,6 +28,7 @@ ENRICHMENT_UPDATE_FIELDS = {
     "last_verified_at",
     "salary_text",
     "equity_mentioned",
+    "job_url",
     "visa_sponsorship",
     "work_authorization",
     "required_skills_json",

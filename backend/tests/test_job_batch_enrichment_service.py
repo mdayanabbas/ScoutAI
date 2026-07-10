@@ -126,7 +126,7 @@ def test_explicit_job_ids_preserve_order_dedupe_and_report_missing(db_session):
 async def test_orchestration_continues_after_failure_and_counts_once(db_session):
     first = _job(db_session, title="First")
     failed = _job(db_session, title="Failed One")
-    skipped = _job(db_session, title="Unsupported", job_url="https://jobs.ashbyhq.com/acme")
+    skipped = _job(db_session, title="Unsupported", job_url="https://jobs.example.com/acme")
     fake = FakeDetailService(db_session, fail_ids={failed.id}, statuses={skipped.id: "skipped"})
 
     result = await JobBatchEnrichmentService(db_session, detail_service=fake).enrich_jobs(
@@ -186,7 +186,7 @@ async def test_idempotency_default_skips_enriched_and_force_reprocesses(db_sessi
 @pytest.mark.asyncio
 async def test_delay_occurs_only_between_provider_backed_jobs(monkeypatch, db_session):
     first = _job(db_session, title="First")
-    skipped = _job(db_session, title="Skipped", job_url="https://jobs.ashbyhq.com/acme")
+    skipped = _job(db_session, title="Skipped", job_url="https://jobs.example.com/acme")
     second = _job(db_session, title="Second")
     sleeps: list[float] = []
 
@@ -201,3 +201,21 @@ async def test_delay_occurs_only_between_provider_backed_jobs(monkeypatch, db_se
     ).enrich_jobs(limit=10, job_ids=[first.id, skipped.id, second.id])
 
     assert sleeps == [0.025]
+
+
+@pytest.mark.asyncio
+async def test_yc_and_ashby_jobs_process_in_one_batch(db_session):
+    yc = _job(db_session, title="YC")
+    ashby = _job(db_session, title="Ashby", job_url="https://jobs.ashbyhq.com/lago/backend")
+    unsupported = _job(db_session, title="Unsupported", job_url="https://jobs.example.com/acme")
+    fake = FakeDetailService(db_session, statuses={unsupported.id: "skipped"})
+
+    result = await JobBatchEnrichmentService(db_session, detail_service=fake).enrich_jobs(
+        limit=10,
+        job_ids=[yc.id, ashby.id, unsupported.id],
+    )
+
+    assert [item.job_id for item in result.results] == [yc.id, ashby.id, unsupported.id]
+    assert result.jobs_enriched == 2
+    assert result.jobs_skipped == 1
+    assert JobRepository(db_session).count_jobs() == 3

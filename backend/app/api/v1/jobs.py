@@ -12,6 +12,7 @@ from app.repositories.job_enrichment_attempt_repository import (
 )
 from app.schemas.common import MessageResponse, PaginatedResponse
 from app.schemas.job import (
+    AshbyBoardExpansionRead,
     JobBatchEnrichmentRead,
     JobBatchEnrichmentRequest,
     JobCreate,
@@ -25,6 +26,7 @@ from app.schemas.job import (
 from app.schemas.job_source import JobSourceDetectionRead
 from app.services.job_batch_enrichment_service import JobBatchEnrichmentService
 from app.services.job_detail_enrichment_service import JobDetailEnrichmentService
+from app.services.ashby_board_expansion_service import AshbyBoardExpansionService
 from app.services.job_service import JobService
 from app.utils.enums import JobStatus, RemoteType, RoleCategory
 
@@ -46,6 +48,12 @@ def get_job_batch_enrichment_service(
     db: Session = Depends(get_db),
 ) -> JobBatchEnrichmentService:
     return JobBatchEnrichmentService(db)
+
+
+def get_ashby_board_expansion_service(
+    db: Session = Depends(get_db),
+) -> AshbyBoardExpansionService:
+    return AshbyBoardExpansionService(db)
 
 
 @router.post(
@@ -208,6 +216,26 @@ async def enrich_job(
         if result.attempt_id
         else None
     )
+
+
+@router.post(
+    "/jobs/{job_id}/expand-ashby-board",
+    response_model=AshbyBoardExpansionRead,
+    summary="Expand one Ashby board-level job into exact child jobs",
+)
+async def expand_ashby_board(
+    job_id: str,
+    db: Session = Depends(get_db),
+    job_service: JobService = Depends(get_job_service),
+    service: AshbyBoardExpansionService = Depends(get_ashby_board_expansion_service),
+):
+    job_service.get_job(job_id)
+    running = JobEnrichmentAttemptRepository(db).get_running_for_job(job_id)
+    if running is not None:
+        logger.info("Concurrent board expansion rejected", extra={"job_id": job_id})
+        raise ConflictError("Job enrichment is already running")
+    logger.info("Ashby board expansion requested", extra={"job_id": job_id})
+    return await service.expand_job_board(job_id)
     refreshed_job = job_service.get_job(job_id)
     logger.info(
         "API enrichment completed",

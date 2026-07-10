@@ -21,7 +21,7 @@ class FakeProvider:
     def __init__(self, result: JobDetailExtractionResult | Exception):
         self.result = result
 
-    async def enrich(self, detection):
+    async def enrich(self, detection, **kwargs):
         if isinstance(self.result, Exception):
             raise self.result
         return self.result
@@ -82,6 +82,34 @@ def _parsed(title="Full Stack Engineer (TS/SCI)", *, success=True, reason="valid
             "salary_min": 0.98,
         },
         evidence={"strategy": "test", "overall_confidence": 0.95},
+        reason=reason,
+    )
+
+
+def _ashby_parsed(title="Backend Engineer", *, success=True, reason="exact_ashby_posting_match"):
+    url = "https://jobs.ashbyhq.com/lago/backend"
+    return JobDetailExtractionResult(
+        success=success,
+        provider="ashby_public_job_board",
+        source_url=url,
+        canonical_url=url,
+        title=JobFieldValue(title, 1.0, "ashby_api_title"),
+        description=JobFieldValue("Build billing systems. " * 20, 0.95, "ashby_description"),
+        role_category=JobFieldValue("backend_engineer", 0.95, "classifier"),
+        location=JobFieldValue("Remote", 0.94, "ashby_location"),
+        remote_type=JobFieldValue("remote_worldwide", 0.95, "ashby_workplace_type"),
+        employment_type=JobFieldValue("full_time", 0.95, "ashby_employment_type"),
+        job_url=JobFieldValue(url, 0.98, "ashby_job_url"),
+        apply_url=JobFieldValue(url, 0.9, "ashby_apply_url"),
+        field_confidence={
+            "title": 1.0,
+            "description": 0.95,
+            "role_category": 0.95,
+            "location": 0.94,
+            "employment_type": 0.95,
+            "job_url": 0.98,
+        },
+        evidence={"strategy": "ashby_test", "overall_confidence": 0.96},
         reason=reason,
     )
 
@@ -171,14 +199,51 @@ async def test_service_marks_partial_unresolved_failed_and_preserves_attempt_his
 
 
 @pytest.mark.asyncio
-async def test_service_skips_non_yc_jobs_without_marking_failed(db_session):
-    job = _job(db_session, job_url="https://jobs.ashbyhq.com/acme")
+async def test_service_skips_unsupported_jobs_without_marking_failed(db_session):
+    job = _job(db_session, job_url="https://jobs.example.com/acme")
 
     result = await JobDetailEnrichmentService(db_session, yc_provider=FakeProvider(_parsed())).enrich_job(job.id)
 
     assert result.status == "skipped"
     assert result.reason == "unsupported_provider_for_current_brick"
     assert JobRepository(db_session).get_by_id(job.id).enrichment_status == "not_enriched"
+
+
+@pytest.mark.asyncio
+async def test_service_enriches_ashby_job_and_upgrades_board_url(db_session):
+    job = _job(db_session, title="Open Roles", job_url="https://jobs.ashbyhq.com/lago")
+
+    result = await JobDetailEnrichmentService(
+        db_session,
+        ashby_provider=FakeProvider(_ashby_parsed()),
+    ).enrich_job(job.id)
+
+    updated = JobRepository(db_session).get_by_id(job.id)
+    attempts = JobEnrichmentAttemptRepository(db_session).list_by_job_id(job.id)
+    assert result.status == "enriched"
+    assert result.provider == "ashby_public_job_board"
+    assert updated.title == "Backend Engineer"
+    assert updated.job_url == "https://jobs.ashbyhq.com/lago/backend"
+    assert attempts[0].provider == "ashby_public_job_board"
+    assert attempts[0].status == "succeeded"
+
+
+@pytest.mark.asyncio
+async def test_service_marks_ashby_ambiguity_unresolved_and_leaves_job_unchanged(db_session):
+    job = _job(db_session, title="GTM Team", job_url="https://jobs.ashbyhq.com/lago")
+    unresolved = _ashby_parsed(success=False, reason="ambiguous_ashby_job_matches")
+
+    result = await JobDetailEnrichmentService(
+        db_session,
+        ashby_provider=FakeProvider(unresolved),
+    ).enrich_job(job.id)
+
+    updated = JobRepository(db_session).get_by_id(job.id)
+    attempts = JobEnrichmentAttemptRepository(db_session).list_by_job_id(job.id)
+    assert result.status == "unresolved"
+    assert updated.title == "GTM Team"
+    assert updated.job_url == "https://jobs.ashbyhq.com/lago"
+    assert attempts[0].status == "unresolved"
 
 
 @pytest.mark.asyncio
