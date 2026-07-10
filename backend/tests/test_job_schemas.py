@@ -32,6 +32,21 @@ class JobObj:
     status = "active"
     first_seen_at = None
     last_seen_at = None
+    seniority = "senior"
+    employment_type = "full_time"
+    apply_url = "https://acme.ai/apply"
+    published_at = None
+    last_verified_at = None
+    salary_text = None
+    equity_mentioned = True
+    visa_sponsorship = None
+    work_authorization = None
+    required_skills_json = ["python"]
+    preferred_skills_json = None
+    technologies_json = ["fastapi"]
+    enrichment_status = "enriched"
+    enrichment_confidence = 0.9
+    enriched_at = None
     created_at = datetime.now(timezone.utc)
     updated_at = None
 
@@ -57,6 +72,8 @@ def test_job_read_supports_from_attributes():
     assert job.normalized_title == "ai engineer"
     assert job.company_name == "Acme AI"
     assert job.company_website_url == "acme.ai"
+    assert job.enrichment_status == "enriched"
+    assert job.required_skills_json == ["python"]
 
 
 def test_job_read_uses_null_company_fields_when_relationship_unavailable():
@@ -84,3 +101,26 @@ def test_invalid_salary_range_fails():
             salary_min=200,
             salary_max=100,
         )
+
+
+def test_job_enrichment_attempt_read_maps_internal_json_fields():
+    from app.schemas.job import JobEnrichmentAttemptRead
+
+    now = datetime.now(timezone.utc)
+    data = JobEnrichmentAttemptRead.model_validate(
+        {
+            "id": "attempt-1",
+            "job_id": "job-1",
+            "provider": "first_party_job_page",
+            "status": "succeeded",
+            "extracted_data_json": {"title": "Engineer"},
+            "evidence_json": {"source": "h1"},
+            "field_confidence_json": {"title": 0.9},
+            "started_at": now,
+            "created_at": now,
+        }
+    )
+
+    assert data.extracted_data == {"title": "Engineer"}
+    assert data.evidence == {"source": "h1"}
+    assert data.field_confidence == {"title": 0.9}

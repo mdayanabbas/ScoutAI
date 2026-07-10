@@ -64,7 +64,14 @@ from app.schemas.discovery_job_ingestion import (
     DiscoveryJobIngestionResult,
     DiscoveryRunJobIngestionResult,
 )
-from app.schemas.job import JobBase, JobCreate, JobListItem, JobRead, JobUpdate
+from app.schemas.job import (
+    JobBase,
+    JobCreate,
+    JobEnrichmentAttemptRead,
+    JobListItem,
+    JobRead,
+    JobUpdate,
+)
 from app.schemas.tech_stack_item import (
     TechStackItemBase,
     TechStackItemCreate,
@@ -120,6 +127,7 @@ __all__ = [
     "ErrorResponse",
     "JobBase",
     "JobCreate",
+    "JobEnrichmentAttemptRead",
     "JobListItem",
     "JobRead",
     "JobUpdate",

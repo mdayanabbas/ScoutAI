@@ -11,6 +11,9 @@ from app.repositories.discovery_candidate_repository import DiscoveryCandidateRe
 from app.repositories.discovery_evidence_repository import DiscoveryEvidenceRepository
 from app.repositories.discovery_run_repository import DiscoveryRunRepository
 from app.repositories.job_repository import JobRepository
+from app.repositories.job_enrichment_attempt_repository import (
+    JobEnrichmentAttemptRepository,
+)
 from app.repositories.profile_repository import UserProfileRepository
 from app.repositories.tech_stack_repository import TechStackRepository
 
@@ -26,6 +29,7 @@ __all__ = [
     "DiscoveryEvidenceRepository",
     "DiscoveryRunRepository",
     "JobRepository",
+    "JobEnrichmentAttemptRepository",
     "TechStackRepository",
     "UserProfileRepository",
 ]

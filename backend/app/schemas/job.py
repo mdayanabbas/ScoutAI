@@ -24,6 +24,21 @@ class JobBase(BaseModel):
     status: JobStatus = JobStatus.ACTIVE
     first_seen_at: datetime | None = None
     last_seen_at: datetime | None = None
+    seniority: str | None = None
+    employment_type: str | None = None
+    apply_url: str | None = None
+    published_at: datetime | None = None
+    last_verified_at: datetime | None = None
+    salary_text: str | None = None
+    equity_mentioned: bool | None = None
+    visa_sponsorship: str | None = None
+    work_authorization: str | None = None
+    required_skills_json: list[str] | None = None
+    preferred_skills_json: list[str] | None = None
+    technologies_json: list[str] | None = None
+    enrichment_status: str = "not_enriched"
+    enrichment_confidence: float | None = None
+    enriched_at: datetime | None = None
 
     @model_validator(mode="after")
     def validate_ranges(self):
@@ -63,6 +78,21 @@ class JobUpdate(BaseModel):
     status: JobStatus | None = None
     first_seen_at: datetime | None = None
     last_seen_at: datetime | None = None
+    seniority: str | None = None
+    employment_type: str | None = None
+    apply_url: str | None = None
+    published_at: datetime | None = None
+    last_verified_at: datetime | None = None
+    salary_text: str | None = None
+    equity_mentioned: bool | None = None
+    visa_sponsorship: str | None = None
+    work_authorization: str | None = None
+    required_skills_json: list[str] | None = None
+    preferred_skills_json: list[str] | None = None
+    technologies_json: list[str] | None = None
+    enrichment_status: str | None = None
+    enrichment_confidence: float | None = None
+    enriched_at: datetime | None = None
 
     @model_validator(mode="after")
     def validate_ranges(self):
@@ -121,6 +151,21 @@ class JobListItem(BaseModel):
     status: JobStatus
     first_seen_at: datetime | None = None
     last_seen_at: datetime | None = None
+    seniority: str | None = None
+    employment_type: str | None = None
+    apply_url: str | None = None
+    published_at: datetime | None = None
+    last_verified_at: datetime | None = None
+    salary_text: str | None = None
+    equity_mentioned: bool | None = None
+    visa_sponsorship: str | None = None
+    work_authorization: str | None = None
+    required_skills_json: list[str] | None = None
+    preferred_skills_json: list[str] | None = None
+    technologies_json: list[str] | None = None
+    enrichment_status: str = "not_enriched"
+    enrichment_confidence: float | None = None
+    enriched_at: datetime | None = None
     created_at: datetime
     updated_at: datetime | None = None
 
@@ -165,7 +210,71 @@ def _map_company_fields(value: Any) -> Any:
             "status": value.status,
             "first_seen_at": value.first_seen_at,
             "last_seen_at": value.last_seen_at,
+            "seniority": getattr(value, "seniority", None),
+            "employment_type": getattr(value, "employment_type", None),
+            "apply_url": getattr(value, "apply_url", None),
+            "published_at": getattr(value, "published_at", None),
+            "last_verified_at": getattr(value, "last_verified_at", None),
+            "salary_text": getattr(value, "salary_text", None),
+            "equity_mentioned": getattr(value, "equity_mentioned", None),
+            "visa_sponsorship": getattr(value, "visa_sponsorship", None),
+            "work_authorization": getattr(value, "work_authorization", None),
+            "required_skills_json": getattr(value, "required_skills_json", None),
+            "preferred_skills_json": getattr(value, "preferred_skills_json", None),
+            "technologies_json": getattr(value, "technologies_json", None),
+            "enrichment_status": getattr(value, "enrichment_status", "not_enriched"),
+            "enrichment_confidence": getattr(value, "enrichment_confidence", None),
+            "enriched_at": getattr(value, "enriched_at", None),
             "created_at": value.created_at,
             "updated_at": value.updated_at,
         }
     return value
+
+
+class JobEnrichmentAttemptRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    job_id: str
+    provider: str
+    status: str
+    reason: str | None = None
+    error_message: str | None = None
+    source_url: str | None = None
+    extracted_data: dict[str, Any] | None = None
+    evidence: dict[str, Any] | None = None
+    field_confidence: dict[str, Any] | None = None
+    started_at: datetime
+    finished_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def map_json_fields(cls, value: Any) -> Any:
+        if isinstance(value, dict):
+            if "extracted_data" not in value and "extracted_data_json" in value:
+                value["extracted_data"] = value["extracted_data_json"]
+            if "evidence" not in value and "evidence_json" in value:
+                value["evidence"] = value["evidence_json"]
+            if "field_confidence" not in value and "field_confidence_json" in value:
+                value["field_confidence"] = value["field_confidence_json"]
+            return value
+        if hasattr(value, "extracted_data_json"):
+            return {
+                "id": value.id,
+                "job_id": value.job_id,
+                "provider": value.provider,
+                "status": value.status,
+                "reason": value.reason,
+                "error_message": value.error_message,
+                "source_url": value.source_url,
+                "extracted_data": value.extracted_data_json,
+                "evidence": value.evidence_json,
+                "field_confidence": value.field_confidence_json,
+                "started_at": value.started_at,
+                "finished_at": value.finished_at,
+                "created_at": value.created_at,
+                "updated_at": value.updated_at,
+            }
+        return value

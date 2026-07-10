@@ -29,6 +29,21 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    connection = op.get_bind()
+    long_value_count = connection.execute(
+        sa.text(
+            """
+            SELECT COUNT(*)
+            FROM company_enrichment_attempts
+            WHERE length(resolver) > 21
+            """
+        )
+    ).scalar_one()
+    if long_value_count:
+        raise RuntimeError(
+            "Cannot downgrade company_enrichment_attempts.resolver to VARCHAR(21): "
+            "rows with resolver values longer than 21 characters exist."
+        )
     op.alter_column(
         "company_enrichment_attempts",
         "resolver",

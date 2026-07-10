@@ -117,6 +117,24 @@ class JobStatus(StrEnum):
     UNKNOWN = "unknown"
 
 
+class JobEnrichmentStatus(StrEnum):
+    NOT_ENRICHED = "not_enriched"
+    PENDING = "pending"
+    ENRICHED = "enriched"
+    PARTIALLY_ENRICHED = "partially_enriched"
+    UNRESOLVED = "unresolved"
+    FAILED = "failed"
+
+
+class JobEnrichmentAttemptStatus(StrEnum):
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    PARTIAL = "partial"
+    UNRESOLVED = "unresolved"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
 class RoleCategory(StrEnum):
     AI_ENGINEER = "ai_engineer"
     BACKEND_ENGINEER = "backend_engineer"
