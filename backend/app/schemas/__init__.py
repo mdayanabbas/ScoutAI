@@ -72,6 +72,7 @@ from app.schemas.job import (
     JobRead,
     JobUpdate,
 )
+from app.schemas.job_source import JobSourceDetectionRead
 from app.schemas.tech_stack_item import (
     TechStackItemBase,
     TechStackItemCreate,
@@ -130,6 +131,7 @@ __all__ = [
     "JobEnrichmentAttemptRead",
     "JobListItem",
     "JobRead",
+    "JobSourceDetectionRead",
     "JobUpdate",
     "MessageResponse",
     "ManualCompanyDomainInput",

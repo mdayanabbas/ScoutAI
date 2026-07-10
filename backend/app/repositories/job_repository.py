@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.job import Job
 from app.repositories.base import BaseRepository
 from app.utils.enums import JobEnrichmentStatus, JobStatus, RemoteType
+from app.utils.urls import normalize_url
 
 ENRICHMENT_UPDATE_FIELDS = {
     "seniority",
@@ -34,10 +35,11 @@ class JobRepository(BaseRepository[Job]):
     def get_by_company_and_url(
         self, company_id: str, job_url: str
     ) -> Job | None:
+        url_variants = {job_url, normalize_url(job_url)}
         stmt = (
             select(Job)
             .options(selectinload(Job.company))
-            .where(Job.company_id == company_id, Job.job_url == job_url)
+            .where(Job.company_id == company_id, Job.job_url.in_(url_variants))
         )
         return self.session.scalar(stmt)
 
@@ -55,9 +57,10 @@ class JobRepository(BaseRepository[Job]):
         job_url: str,
         normalized_title: str,
     ) -> Job | None:
+        url_variants = {job_url, normalize_url(job_url)}
         stmt = select(Job).where(
             Job.company_id == company_id,
-            Job.job_url == job_url,
+            Job.job_url.in_(url_variants),
             Job.normalized_title == normalized_title,
         )
         return self.session.scalar(stmt)

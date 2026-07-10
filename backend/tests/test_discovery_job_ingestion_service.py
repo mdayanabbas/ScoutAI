@@ -112,6 +112,7 @@ def test_creates_job_for_resolved_hacker_news_candidate(db_session):
     assert result.job.discovery_candidate_id == candidate.id
     assert result.job.title == "Founding Engineer"
     assert result.job.location == "Berlin"
+    assert result.job.job_url == "https://www.ycombinator.com/companies/dexter/jobs/1"
     assert result.job.source_platform == "hacker_news"
     links = db_session.query(JobDiscoveryLink).all()
     assert len(links) == 1
@@ -179,6 +180,19 @@ def test_cross_run_canonical_match_preserves_original_discovery_candidate(db_ses
     assert result.job.updated_at != original_updated_at
     links = db_session.query(JobDiscoveryLink).filter_by(job_id=first.job_id).all()
     assert {link.discovery_candidate_id for link in links} == {candidate.id, second.id}
+
+
+def test_newly_ingested_first_party_url_is_canonicalized(db_session):
+    candidate, _company, _run_obj = _resolved_candidate(
+        db_session,
+        title="9 Mothers Is Hiring a Founding Engineer",
+        description="Apply at https://www.9MOTHERS.com:443/careers/?utm_source=hn#apply",
+    )
+
+    result = DiscoveryJobIngestionService(db_session).ingest_candidate(candidate.id)
+
+    assert result.action == "created"
+    assert result.job.job_url == "https://9mothers.com/careers"
 
 
 def test_job_url_normalization_equivalent_urls_match():
@@ -259,4 +273,5 @@ def test_resolved_ashby_candidate_uses_focused_posting_evidence(db_session):
     assert result.job.location == "New York"
     assert result.job.remote_type == "hybrid"
     assert result.job.source_platform == "ashby"
-    assert result.job.job_url == "jobs.ashbyhq.com/acme/posting-id"
+    assert result.job.job_url == "https://jobs.ashbyhq.com/acme/posting-id"
+    assert result.job.apply_url == "https://jobs.ashbyhq.com/acme/posting-id/application"
