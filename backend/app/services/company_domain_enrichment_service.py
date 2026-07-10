@@ -19,6 +19,7 @@ from app.enrichment.resolvers import (
     AshbyCompanyResolutionResult,
     AshbyJobBoardResolver,
     AshbyJobBoardResult,
+    WebSearchCompanyResolver,
     YCCompanyResolutionResult,
     YCombinatorCompanyResolver,
 )
@@ -58,6 +59,7 @@ class CompanyDomainEnrichmentService:
         validator: DomainValidator | None = None,
         yc_resolver: YCombinatorCompanyResolver | None = None,
         ashby_resolver: AshbyJobBoardResolver | None = None,
+        web_search_resolver: WebSearchCompanyResolver | None = None,
     ) -> None:
         self.session = session
         self.candidate_repository = DiscoveryCandidateRepository(session)
@@ -69,6 +71,11 @@ class CompanyDomainEnrichmentService:
         self.validator = validator or DomainValidator()
         self.yc_resolver = yc_resolver or YCombinatorCompanyResolver()
         self.ashby_resolver = ashby_resolver or AshbyJobBoardResolver()
+        self._web_search_query_cache: dict[str, Any] = {}
+        self.web_search_resolver = web_search_resolver or WebSearchCompanyResolver(
+            validator=self.validator,
+            query_cache=self._web_search_query_cache,
+        )
         self._yc_resolution_cache: dict[str, YCCompanyResolutionResult] = {}
         self._ashby_board_cache: dict[str, AshbyJobBoardResult] = {}
 
@@ -143,6 +150,7 @@ class CompanyDomainEnrichmentService:
             try:
                 results.append(await self.enrich_candidate(candidate.id))
             except Exception as exc:
+                self.session.rollback()
                 logger.info(
                     "Candidate enrichment failed",
                     extra={"candidate_id": candidate.id, "error": exc.__class__.__name__},
@@ -152,7 +160,7 @@ class CompanyDomainEnrichmentService:
                         candidate,
                         CompanyEnrichmentDecision.FAILED,
                         None,
-                        str(exc) or exc.__class__.__name__,
+                        _safe_error_message(exc),
                     )
                 )
 
@@ -210,16 +218,32 @@ class CompanyDomainEnrichmentService:
             ],
         }
         if selected is None:
+            fallback_result: CandidateEnrichmentResult | None = None
             yc_result = await self._try_ycombinator_profile_resolution(
                 candidate, attempt, evidence
             )
-            if yc_result is not None:
+            if yc_result is not None and yc_result.decision in {
+                CompanyEnrichmentDecision.CREATED_COMPANY,
+                CompanyEnrichmentDecision.MATCHED_EXISTING_COMPANY,
+            }:
                 return yc_result
+            fallback_result = yc_result or fallback_result
             ashby_result = await self._try_ashby_resolution(
                 candidate, attempt, evidence
             )
-            if ashby_result is not None:
+            if ashby_result is not None and ashby_result.decision in {
+                CompanyEnrichmentDecision.CREATED_COMPANY,
+                CompanyEnrichmentDecision.MATCHED_EXISTING_COMPANY,
+            }:
                 return ashby_result
+            fallback_result = ashby_result or fallback_result
+            web_search_result = await self._try_web_search_resolution(
+                candidate, attempt, evidence
+            )
+            if web_search_result is not None:
+                return web_search_result
+            if fallback_result is not None:
+                return fallback_result
             attempt = self.attempt_repository.mark_unresolved(
                 attempt, unresolved_reason or "no_domain_proposals", evidence
             )
@@ -463,6 +487,69 @@ class CompanyDomainEnrichmentService:
             evidence,
         )
 
+    async def _try_web_search_resolution(
+        self,
+        candidate: DiscoveryCandidate,
+        attempt: CompanyEnrichmentAttempt,
+        base_evidence: dict[str, Any],
+    ) -> CandidateEnrichmentResult | None:
+        if not self.web_search_resolver.supports(candidate):
+            return None
+        logger.info(
+            "Web search resolver selected",
+            extra={"candidate_id": candidate.id},
+        )
+        result = await self.web_search_resolver.resolve(candidate)
+        evidence = {
+            **base_evidence,
+            "web_search_company_identity": result.evidence
+            or {
+                "provider": result.provider,
+                "queries": list(result.queries),
+                "reason": result.reason,
+            },
+        }
+        self.attempt_repository.update(
+            attempt,
+            {
+                "resolver": CompanyEnrichmentResolver.WEB_SEARCH_COMPANY_IDENTITY,
+                "proposed_website_url": result.proposed_website_url,
+                "proposed_domain": result.proposed_domain,
+                "confidence": result.confidence,
+                "reason": result.reason,
+                "evidence_json": evidence,
+            },
+        )
+        if not result.resolved or not result.proposed_website_url:
+            reason = result.reason or "no_trustworthy_company_domain"
+            self.attempt_repository.mark_unresolved(attempt, reason, evidence)
+            logger.info(
+                "Web search candidate remained unresolved",
+                extra={"candidate_id": candidate.id, "reason": reason},
+            )
+            return self._result(
+                candidate,
+                CompanyEnrichmentDecision.UNRESOLVED,
+                None,
+                reason,
+            )
+
+        validation = DomainValidationResult(
+            valid=True,
+            requested_url=result.proposed_website_url,
+            final_url=result.proposed_website_url,
+            normalized_domain=result.proposed_domain,
+            status_code=200,
+        )
+        return self._resolve_candidate_with_domain(
+            candidate,
+            attempt,
+            validation,
+            CompanyEnrichmentResolver.WEB_SEARCH_COMPANY_IDENTITY,
+            result.confidence or 0.9,
+            evidence,
+        )
+
     def _persist_ashby_evidence(
         self,
         candidate: DiscoveryCandidate,
@@ -668,3 +755,8 @@ def _ashby_validation_reason(reason: str | None) -> str:
     }:
         return "ashby_company_domain_unsafe"
     return "ashby_company_domain_unreachable"
+
+
+def _safe_error_message(exc: Exception) -> str:
+    message = str(exc).strip()
+    return message if message else exc.__class__.__name__

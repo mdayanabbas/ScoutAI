@@ -7,6 +7,7 @@ from app.enrichment.ashby_public_job_parser import AshbyPublicJob
 from app.enrichment.resolvers import (
     AshbyCompanyResolutionResult,
     AshbyJobBoardResult,
+    WebSearchCompanyResolutionResult,
     YCCompanyResolutionResult,
 )
 from app.models.company import Company
@@ -128,6 +129,67 @@ class FakeAshbyResolver:
             reason="ashby_company_domain_evidence",
             evidence={"listed_job_count": 1},
         )
+
+
+class FakeWebSearchResolver:
+    def __init__(
+        self,
+        *,
+        resolved: bool = True,
+        domain: str = "supabase.com",
+        supports: bool = True,
+    ):
+        self.resolved = resolved
+        self.domain = domain
+        self._supports = supports
+        self.calls = 0
+
+    def supports(self, candidate):
+        return self._supports
+
+    async def resolve(self, candidate):
+        self.calls += 1
+        if not self.resolved:
+            return WebSearchCompanyResolutionResult(
+                False,
+                provider="fake",
+                queries=('"Supabase" official website company',),
+                reason="web_search_provider_error",
+                evidence={
+                    "provider": "fake",
+                    "queries": ['"Supabase" official website company'],
+                    "resolution_reason": "web_search_provider_error",
+                },
+            )
+        return WebSearchCompanyResolutionResult(
+            True,
+            proposed_website_url=f"https://{self.domain}",
+            proposed_domain=self.domain,
+            confidence=0.95,
+            provider="fake",
+            queries=('"Supabase" official website company',),
+            reason="web_search_company_identity_resolved",
+            evidence={
+                "provider": "fake",
+                "queries": ['"Supabase" official website company'],
+                "selected_domain": self.domain,
+                "selected_confidence": 0.95,
+                "identity_check": {
+                    "matched": True,
+                    "confidence": 0.95,
+                    "matched_signals": ["title"],
+                    "conflicting_signals": [],
+                },
+            },
+        )
+
+
+class RaisingWebSearchResolver:
+    def supports(self, candidate):
+        return True
+
+    async def resolve(self, candidate):
+        raise RuntimeError("provider exploded")
 
 
 def _yc_resolution(
@@ -442,3 +504,160 @@ async def test_ashby_board_response_reused_by_slug(db_session):
     assert result.candidates_resolved == 2
     assert resolver.fetch_calls == 1
     assert service.company_repository.count_companies() == 1
+
+
+@pytest.mark.asyncio
+async def test_web_search_resolves_supabase_style_candidate_after_ashby_unresolved(db_session):
+    candidate = _ashby_candidate(db_session, source_identifier="hn:web-search-supabase")
+    web_resolver = FakeWebSearchResolver(domain="supabase.com")
+    service = CompanyDomainEnrichmentService(
+        db_session,
+        validator=FakeValidator(),
+        ashby_resolver=FakeAshbyResolver(resolved=False),
+        web_search_resolver=web_resolver,
+    )
+
+    result = await service.enrich_candidate(candidate.id)
+
+    assert result.decision == "created_company"
+    assert result.resolved_domain == "supabase.com"
+    assert result.candidate.deferred_reason is None
+    assert result.attempts[-1].resolver == "web_search_company_identity"
+    assert result.attempts[-1].evidence["web_search_company_identity"]["selected_domain"] == "supabase.com"
+    assert web_resolver.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_web_search_resolves_lago_style_candidate_and_matches_existing_company(db_session):
+    candidate = _deferred_candidate(
+        db_session,
+        text="Lago is hiring through YC",
+        raw_payload={
+            "yc_batch": "S21",
+            "url_classification": {
+                "platform": "ycombinator",
+                "external_company_slug": "lago",
+            },
+        },
+        source_identifier="hn:web-search-lago",
+        name="Lago",
+    )
+    db_session.add(
+        Company(
+            name="Lago",
+            website_url="https://getlago.com",
+            normalized_domain="getlago.com",
+            source="yc",
+            stage="unknown",
+            is_active=True,
+        )
+    )
+    db_session.commit()
+    service = CompanyDomainEnrichmentService(
+        db_session,
+        validator=FakeValidator(),
+        yc_resolver=FakeYCResolver(
+            YCCompanyResolutionResult(False, reason="yc_official_website_missing")
+        ),
+        web_search_resolver=FakeWebSearchResolver(domain="getlago.com"),
+    )
+
+    result = await service.enrich_candidate(candidate.id)
+
+    assert result.decision == "matched_existing_company"
+    assert result.resolved_domain == "getlago.com"
+    assert service.company_repository.count_companies() == 1
+
+
+@pytest.mark.asyncio
+async def test_web_search_not_called_when_local_evidence_resolves(db_session):
+    candidate = _deferred_candidate(db_session, source_identifier="hn:local-first")
+    web_resolver = FakeWebSearchResolver()
+    service = CompanyDomainEnrichmentService(
+        db_session,
+        validator=FakeValidator(),
+        web_search_resolver=web_resolver,
+    )
+
+    result = await service.enrich_candidate(candidate.id)
+
+    assert result.decision == "created_company"
+    assert web_resolver.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_web_search_not_called_when_yc_resolves(db_session):
+    candidate = _yc_candidate(db_session, source_identifier="hn:yc-no-search")
+    web_resolver = FakeWebSearchResolver()
+    service = CompanyDomainEnrichmentService(
+        db_session,
+        validator=FakeValidator(),
+        yc_resolver=FakeYCResolver(_yc_resolution()),
+        web_search_resolver=web_resolver,
+    )
+
+    result = await service.enrich_candidate(candidate.id)
+
+    assert result.decision == "created_company"
+    assert web_resolver.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_web_search_not_called_when_ashby_resolves(db_session):
+    candidate = _ashby_candidate(db_session, source_identifier="hn:ashby-no-search")
+    web_resolver = FakeWebSearchResolver()
+    service = CompanyDomainEnrichmentService(
+        db_session,
+        validator=FakeValidator(),
+        ashby_resolver=FakeAshbyResolver(resolved=True),
+        web_search_resolver=web_resolver,
+    )
+
+    result = await service.enrich_candidate(candidate.id)
+
+    assert result.decision == "created_company"
+    assert web_resolver.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_web_search_provider_failure_leaves_candidate_deferred(db_session):
+    candidate = _ashby_candidate(db_session, source_identifier="hn:web-failure")
+    service = CompanyDomainEnrichmentService(
+        db_session,
+        validator=FakeValidator(),
+        ashby_resolver=FakeAshbyResolver(resolved=False),
+        web_search_resolver=FakeWebSearchResolver(resolved=False),
+    )
+
+    result = await service.enrich_candidate(candidate.id)
+
+    assert result.decision == "unresolved"
+    assert result.candidate.deferred_reason == "requires_company_domain_enrichment"
+    assert result.attempts[-1].reason == "web_search_provider_error"
+
+
+@pytest.mark.asyncio
+async def test_run_enrichment_returns_partial_success_when_candidate_fails(db_session):
+    resolved = _deferred_candidate(db_session, source_identifier="hn:partial-ok")
+    failing = _deferred_candidate(
+        db_session,
+        text="No usable domain evidence",
+        source_identifier="hn:partial-fail",
+        name="NoDomain",
+    )
+    db_session.query(DiscoveryCandidate).filter(
+        DiscoveryCandidate.id == failing.id
+    ).update({"discovery_run_id": resolved.discovery_run_id})
+    db_session.commit()
+    service = CompanyDomainEnrichmentService(
+        db_session,
+        validator=FakeValidator(),
+        web_search_resolver=RaisingWebSearchResolver(),
+    )
+
+    result = await service.enrich_discovery_run(resolved.discovery_run_id)
+
+    assert result.candidates_examined == 2
+    assert result.candidates_resolved == 1
+    assert result.candidates_failed == 1
+    assert {item.decision for item in result.results} == {"created_company", "failed"}

@@ -7,6 +7,10 @@ from app.enrichment.resolvers.ycombinator_company_resolver import (
     YCCompanyResolutionResult,
     YCombinatorCompanyResolver,
 )
+from app.enrichment.resolvers.web_search_company_resolver import (
+    WebSearchCompanyResolutionResult,
+    WebSearchCompanyResolver,
+)
 
 __all__ = [
     "AshbyCompanyResolutionResult",
@@ -14,4 +18,6 @@ __all__ = [
     "AshbyJobBoardResolver",
     "YCCompanyResolutionResult",
     "YCombinatorCompanyResolver",
+    "WebSearchCompanyResolutionResult",
+    "WebSearchCompanyResolver",
 ]

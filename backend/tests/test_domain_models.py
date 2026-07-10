@@ -12,6 +12,7 @@ EXPECTED_TABLES = {
     "crawl_runs",
     "agent_runs",
     "agent_steps",
+    "job_discovery_links",
 }
 
 
@@ -61,6 +62,12 @@ def test_company_page_unique_constraint_on_company_id_and_url():
 def test_job_unique_constraint_on_company_id_and_job_url():
     job = Base.metadata.tables["jobs"]
     assert _has_unique_constraint(job, {"company_id", "job_url"})
+
+
+def test_job_discovery_links_constraints():
+    table = Base.metadata.tables["job_discovery_links"]
+    assert _has_unique_constraint(table, {"job_id", "discovery_candidate_id"})
+    assert _has_unique_constraint(table, {"discovery_candidate_id"})
 
 
 def test_tech_stack_unique_constraint_on_company_name_source():

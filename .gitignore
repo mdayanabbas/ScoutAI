@@ -17,3 +17,14 @@ dist/
 
 # Command Code
 .commandcode/
+
+# Local discovery outputs
+/backend/recent_jobs_run.json
+/backend/new_hn_run.json
+/backend/tavily_enrichment.json
+/backend/search_enrichment.json
+/backend/latest_ashby_enrichment.json
+
+# Any generated backend run output
+/backend/*_run.json
+/backend/*_enrichment.json

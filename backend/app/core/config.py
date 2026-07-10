@@ -1,12 +1,15 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+BACKEND_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=BACKEND_ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -47,6 +50,20 @@ class Settings(BaseSettings):
     ASHBY_MAX_RESPONSE_BYTES: int = Field(default=2_000_000, gt=0)
     ASHBY_USER_AGENT: str = "ScoutAI/0.1 Ashby-public-job-resolver"
     ASHBY_INCLUDE_COMPENSATION: bool = True
+    WEB_SEARCH_PROVIDER: str = "tavily"
+    WEB_SEARCH_ENABLED: bool = False
+    WEB_SEARCH_MAX_QUERIES_PER_CANDIDATE: int = Field(default=2, ge=1, le=10)
+    WEB_SEARCH_RESULTS_PER_QUERY: int = Field(default=5, ge=1, le=20)
+    WEB_SEARCH_REQUEST_TIMEOUT_SECONDS: int = Field(default=10, gt=0)
+    WEB_SEARCH_MAX_RETRIES: int = Field(default=2, ge=0)
+    WEB_SEARCH_MAX_RESPONSE_BYTES: int = Field(default=1_000_000, gt=0)
+    TAVILY_API_KEY: str | None = None
+    TAVILY_SEARCH_BASE_URL: str = "https://api.tavily.com/search"
+    TAVILY_SEARCH_DEPTH: str = "basic"
+    TAVILY_USER_AGENT: str = "ScoutAI/0.1 company-identity-search"
+    BRAVE_SEARCH_API_KEY: str | None = None
+    BRAVE_SEARCH_BASE_URL: str = "https://api.search.brave.com/res/v1/web/search"
+    BRAVE_SEARCH_USER_AGENT: str = "ScoutAI/0.1 company-identity-search"
     DISCOVERY_JOB_INGESTION_MAX_CANDIDATES_PER_RUN: int = Field(default=100, gt=0)
 
     @model_validator(mode="after")

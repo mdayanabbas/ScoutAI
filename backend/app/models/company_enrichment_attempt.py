@@ -39,6 +39,7 @@ class CompanyEnrichmentAttempt(Base, UUIDMixin, TimestampMixin):
             CompanyEnrichmentResolver,
             name="companyenrichmentresolver",
             native_enum=False,
+            length=64,
             values_callable=lambda x: [e.value for e in x],
         ),
         index=True,

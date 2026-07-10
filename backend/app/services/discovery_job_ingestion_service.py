@@ -15,12 +15,12 @@ from app.models.discovery_candidate import DiscoveryCandidate
 from app.models.job import Job
 from app.repositories.discovery_candidate_repository import DiscoveryCandidateRepository
 from app.repositories.discovery_run_repository import DiscoveryRunRepository
+from app.repositories.job_discovery_link_repository import JobDiscoveryLinkRepository
 from app.repositories.job_repository import JobRepository
 from app.schemas.discovery_job_ingestion import (
     DiscoveryJobIngestionResult,
     DiscoveryRunJobIngestionResult,
 )
-from app.services.job_service import JobService
 from app.utils.enums import (
     DiscoveryCandidateStatus,
     DiscoveryDecision,
@@ -35,10 +35,11 @@ logger = logging.getLogger(__name__)
 
 class DiscoveryJobIngestionService:
     def __init__(self, session: Session) -> None:
+        self.session = session
         self.candidate_repository = DiscoveryCandidateRepository(session)
         self.run_repository = DiscoveryRunRepository(session)
         self.job_repository = JobRepository(session)
-        self.job_service = JobService(session)
+        self.job_link_repository = JobDiscoveryLinkRepository(session)
 
     def ingest_candidate(self, candidate_id: str) -> DiscoveryJobIngestionResult:
         candidate = self._require_candidate(candidate_id)
@@ -47,47 +48,61 @@ class DiscoveryJobIngestionService:
         if not self._is_resolved_candidate(candidate):
             return self._skipped(candidate, "Candidate does not have a resolved company")
 
+        link = self.job_link_repository.get_by_candidate_id(candidate.id)
+        if link is not None:
+            return self._already_exists(candidate, link.job)
+
         existing = self.job_repository.get_by_discovery_candidate_id(candidate.id)
         if existing is not None:
+            self._ensure_job_link(existing, candidate)
             return self._already_exists(candidate, existing)
 
         parsed, ashby_metadata = self._parse_job(candidate)
         normalized_job_url = normalize_url(parsed.job_url)
         normalized_job_title = normalize_title(parsed.title) or parsed.title.lower()
-        legacy = self.job_repository.get_legacy_match(
+        canonical = self.job_repository.get_legacy_match(
             candidate.matched_company_id,
             normalized_job_url,
             normalized_job_title,
         )
-        if legacy is not None:
-            legacy = self.job_repository.update_job(
-                legacy,
-                {
-                    "discovery_candidate_id": candidate.id,
-                    "last_seen_at": datetime.now(timezone.utc),
-                },
-            )
-            return self._already_exists(candidate, legacy)
+        if canonical is not None:
+            values = {"last_seen_at": datetime.now(timezone.utc)}
+            if canonical.discovery_candidate_id is None:
+                values["discovery_candidate_id"] = candidate.id
+            canonical = self.job_repository.update_job(canonical, values)
+            self._ensure_job_link(canonical, candidate)
+            return self._already_exists(candidate, canonical)
 
-        job = self.job_service.create_or_update_job(
-            candidate.matched_company_id,
-            {
-                "discovery_candidate_id": candidate.id,
-                "title": parsed.title,
-                "description": parsed.description,
-                "location": parsed.location,
-                "remote_type": parsed.remote_type,
-                "role_category": parsed.role_category,
-                "job_url": parsed.job_url,
-                "source_platform": "ashby" if ashby_metadata else "hacker_news",
-                "status": JobStatus.ACTIVE,
-                "first_seen_at": (
-                    _ashby_published_at(ashby_metadata)
-                    or datetime.now(timezone.utc)
-                ),
-                "last_seen_at": datetime.now(timezone.utc),
-            },
+        url_existing = self.job_repository.get_by_company_and_url(
+            candidate.matched_company_id, normalized_job_url
         )
+        if url_existing is not None:
+            values = {"last_seen_at": datetime.now(timezone.utc)}
+            if url_existing.discovery_candidate_id is None:
+                values["discovery_candidate_id"] = candidate.id
+            url_existing = self.job_repository.update_job(url_existing, values)
+            self._ensure_job_link(url_existing, candidate)
+            return self._already_exists(candidate, url_existing)
+
+        now = datetime.now(timezone.utc)
+        job = self.job_repository.create_job(
+            Job(
+                company_id=candidate.matched_company_id,
+                discovery_candidate_id=candidate.id,
+                title=parsed.title,
+                normalized_title=normalized_job_title,
+                description=parsed.description,
+                location=parsed.location,
+                remote_type=parsed.remote_type,
+                role_category=parsed.role_category,
+                job_url=normalized_job_url,
+                source_platform="ashby" if ashby_metadata else "hacker_news",
+                status=JobStatus.ACTIVE,
+                first_seen_at=_ashby_published_at(ashby_metadata) or now,
+                last_seen_at=now,
+            )
+        )
+        self._ensure_job_link(job, candidate)
         return DiscoveryJobIngestionResult(
             candidate_id=candidate.id,
             company_id=candidate.matched_company_id,
@@ -120,6 +135,7 @@ class DiscoveryJobIngestionService:
             try:
                 results.append(self.ingest_candidate(candidate.id))
             except Exception as exc:
+                self.session.rollback()
                 logger.info(
                     "Discovery job ingestion failed",
                     extra={"candidate_id": candidate.id, "error": exc.__class__.__name__},
@@ -129,7 +145,7 @@ class DiscoveryJobIngestionService:
                         candidate_id=candidate.id,
                         company_id=candidate.matched_company_id,
                         action="failed",
-                        message=str(exc) or exc.__class__.__name__,
+                        message=_safe_error_message(exc),
                     )
                 )
 
@@ -215,6 +231,9 @@ class DiscoveryJobIngestionService:
             job=job,
         )
 
+    def _ensure_job_link(self, job: Job, candidate: DiscoveryCandidate) -> None:
+        self.job_link_repository.ensure_link(job.id, candidate.id)
+
 
 def _ashby_remote_type(metadata: dict, fallback: RemoteType) -> RemoteType:
     workplace = str(metadata.get("workplace_type") or "").lower()
@@ -234,3 +253,8 @@ def _ashby_published_at(metadata: dict | None) -> datetime | None:
         return datetime.fromisoformat(metadata["published_at"].replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+def _safe_error_message(exc: Exception) -> str:
+    message = str(exc).strip()
+    return message if message else exc.__class__.__name__
