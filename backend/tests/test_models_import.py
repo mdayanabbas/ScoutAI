@@ -9,6 +9,7 @@ def test_all_models_importable():
         DiscoveryEvidence,
         DiscoveryRun,
         Job,
+        JobDiscoveryLink,
         TechStackItem,
         UserProfile,
     )
@@ -24,6 +25,7 @@ def test_all_models_importable():
             DiscoveryEvidence,
             DiscoveryRun,
             Job,
+            JobDiscoveryLink,
             TechStackItem,
             UserProfile,
         ]

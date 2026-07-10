@@ -41,7 +41,6 @@ class JobRepository(BaseRepository[Job]):
             Job.company_id == company_id,
             Job.job_url == job_url,
             Job.normalized_title == normalized_title,
-            Job.discovery_candidate_id.is_(None),
         )
         return self.session.scalar(stmt)
 
@@ -82,7 +81,12 @@ class JobRepository(BaseRepository[Job]):
         stmt = self._build_list_query(
             company_id, role_category, remote_type, status, search
         )
-        stmt = stmt.options(selectinload(Job.company)).offset(offset).limit(limit)
+        stmt = (
+            stmt.options(selectinload(Job.company))
+            .order_by(Job.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
         return list(self.session.scalars(stmt).all())
 
     def list_active_jobs(

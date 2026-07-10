@@ -51,7 +51,7 @@ class CompanyRepository(BaseRepository[Company]):
         is_active: bool | None = None,
     ) -> list[Company]:
         stmt = self._build_list_query(search, source, stage, is_active)
-        stmt = stmt.offset(offset).limit(limit)
+        stmt = stmt.order_by(Company.created_at.desc()).offset(offset).limit(limit)
         return list(self.session.scalars(stmt).all())
 
     def count_companies(

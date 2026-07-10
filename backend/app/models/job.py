@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from app.models.agent_run import AgentRun
     from app.models.company import Company
     from app.models.discovery_candidate import DiscoveryCandidate
+    from app.models.job_discovery_link import JobDiscoveryLink
 
 
 class Job(Base, UUIDMixin, TimestampMixin):
@@ -78,6 +79,11 @@ class Job(Base, UUIDMixin, TimestampMixin):
 
     company: Mapped["Company"] = relationship(back_populates="jobs")
     discovery_candidate: Mapped["DiscoveryCandidate | None"] = relationship()
+    discovery_links: Mapped[list["JobDiscoveryLink"]] = relationship(
+        back_populates="job",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
     agent_runs: Mapped[list["AgentRun"]] = relationship(back_populates="job")
 
     __table_args__ = (UniqueConstraint("company_id", "job_url"),)
