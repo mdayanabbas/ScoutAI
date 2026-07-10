@@ -10,6 +10,17 @@ from app.utils.enums import JobEnrichmentStatus, JobStatus, RemoteType
 from app.utils.urls import normalize_url
 
 ENRICHMENT_UPDATE_FIELDS = {
+    "title",
+    "normalized_title",
+    "role_category",
+    "description",
+    "location",
+    "remote_type",
+    "experience_min",
+    "experience_max",
+    "salary_min",
+    "salary_max",
+    "salary_currency",
     "seniority",
     "employment_type",
     "apply_url",
@@ -179,6 +190,41 @@ class JobRepository(BaseRepository[Job]):
                 Job.created_at.asc(),
             )
             .offset(offset)
+            .limit(limit)
+        )
+        return list(self.session.scalars(stmt).all())
+
+    def list_jobs_for_enrichment_batch(
+        self,
+        *,
+        limit: int,
+        include_failed: bool = False,
+        force: bool = False,
+    ) -> list[Job]:
+        eligible_statuses = {
+            JobEnrichmentStatus.NOT_ENRICHED.value,
+            JobEnrichmentStatus.PARTIALLY_ENRICHED.value,
+            JobEnrichmentStatus.UNRESOLVED.value,
+        }
+        if include_failed:
+            eligible_statuses.add(JobEnrichmentStatus.FAILED.value)
+
+        stmt = select(Job).where(Job.status == JobStatus.ACTIVE.value)
+        if not force:
+            stmt = stmt.where(
+                Job.enrichment_status.in_(eligible_statuses)
+                | Job.last_verified_at.is_(None)
+            )
+            if not include_failed:
+                stmt = stmt.where(Job.enrichment_status != JobEnrichmentStatus.FAILED.value)
+            stmt = stmt.where(Job.enrichment_status != JobEnrichmentStatus.ENRICHED.value)
+        stmt = (
+            stmt.options(selectinload(Job.company))
+            .order_by(
+                case((Job.enrichment_status == JobEnrichmentStatus.NOT_ENRICHED.value, 0), else_=1),
+                nullsfirst(Job.last_verified_at.asc()),
+                Job.created_at.asc(),
+            )
             .limit(limit)
         )
         return list(self.session.scalars(stmt).all())

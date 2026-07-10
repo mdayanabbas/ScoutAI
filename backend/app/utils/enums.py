@@ -147,13 +147,20 @@ class JobSourceType(StrEnum):
 class RoleCategory(StrEnum):
     AI_ENGINEER = "ai_engineer"
     BACKEND_ENGINEER = "backend_engineer"
+    DEVELOPER_ADVOCATE = "developer_advocate"
+    FORWARD_DEPLOYED_ENGINEER = "forward_deployed_engineer"
+    INFRASTRUCTURE_ENGINEER = "infrastructure_engineer"
     SOFTWARE_ENGINEER = "software_engineer"
     ML_ENGINEER = "ml_engineer"
     DATA_ENGINEER = "data_engineer"
     FULL_STACK_ENGINEER = "full_stack_engineer"
     FRONTEND_ENGINEER = "frontend_engineer"
     DEVOPS_ENGINEER = "devops_engineer"
+    MARKETING = "marketing"
+    OPERATIONS = "operations"
     PRODUCT_ENGINEER = "product_engineer"
+    PRODUCT_MANAGER = "product_manager"
+    SALES = "sales"
     OTHER = "other"
 
 

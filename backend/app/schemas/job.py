@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.utils.enums import JobStatus, RemoteType, RoleCategory
 
@@ -278,3 +278,76 @@ class JobEnrichmentAttemptRead(BaseModel):
                 "updated_at": value.updated_at,
             }
         return value
+
+
+class JobEnrichmentAttemptListRead(BaseModel):
+    items: list[JobEnrichmentAttemptRead]
+    total: int
+    limit: int
+    offset: int
+
+
+class JobEnrichmentRunRead(BaseModel):
+    job_id: str
+    provider: str | None = None
+    status: str
+    reason: str | None = None
+    source_type: str | None = None
+    source_url: str | None = None
+    canonical_url: str | None = None
+    fields_updated: dict[str, Any] = Field(default_factory=dict)
+    fields_preserved: dict[str, str] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+    enrichment_confidence: float | None = None
+    attempt: JobEnrichmentAttemptRead | None = None
+    job: JobRead | None = None
+
+
+class JobBatchEnrichmentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    limit: int | None = Field(default=None, ge=1)
+    job_ids: list[str] | None = None
+    include_failed: bool = False
+    force: bool = False
+
+    @field_validator("job_ids")
+    @classmethod
+    def validate_job_ids(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        if not value:
+            raise ValueError("job_ids must not be empty")
+        from uuid import UUID
+
+        for item in value:
+            UUID(item)
+        return value
+
+
+class JobBatchEnrichmentItemRead(BaseModel):
+    job_id: str
+    company_name: str | None = None
+    previous_title: str | None = None
+    current_title: str | None = None
+    provider: str | None = None
+    status: str
+    reason: str | None = None
+    fields_updated: dict[str, Any] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
+    attempt_id: str | None = None
+    enrichment_confidence: float | None = None
+
+
+class JobBatchEnrichmentRead(BaseModel):
+    jobs_examined: int
+    jobs_enriched: int
+    jobs_partially_enriched: int
+    jobs_unresolved: int
+    jobs_failed: int
+    jobs_skipped: int
+    jobs_missing: int
+    started_at: datetime
+    finished_at: datetime
+    duration_ms: int
+    results: list[JobBatchEnrichmentItemRead]
