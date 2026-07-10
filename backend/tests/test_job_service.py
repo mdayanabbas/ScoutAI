@@ -31,6 +31,7 @@ def test_job_create_or_update_deduplicates_and_normalizes_title(db_session):
 
     assert updated.id == job.id
     assert updated.normalized_title == "principal ai engineer"
+    assert updated.enrichment_status == "not_enriched"
     assert updated.last_seen_at is not None
     assert service.count_jobs(company_id=company.id) == 1
 

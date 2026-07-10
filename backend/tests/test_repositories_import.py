@@ -10,6 +10,7 @@ def test_core_repositories_importable():
         DiscoveryEvidenceRepository,
         DiscoveryRunRepository,
         JobRepository,
+        JobEnrichmentAttemptRepository,
         TechStackRepository,
         UserProfileRepository,
     )
@@ -26,6 +27,7 @@ def test_core_repositories_importable():
             DiscoveryEvidenceRepository,
             DiscoveryRunRepository,
             JobRepository,
+            JobEnrichmentAttemptRepository,
             TechStackRepository,
             UserProfileRepository,
         ]

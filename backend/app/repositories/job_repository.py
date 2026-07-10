@@ -1,12 +1,30 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, nullsfirst, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.job import Job
 from app.repositories.base import BaseRepository
-from app.utils.enums import JobStatus, RemoteType
+from app.utils.enums import JobEnrichmentStatus, JobStatus, RemoteType
+
+ENRICHMENT_UPDATE_FIELDS = {
+    "seniority",
+    "employment_type",
+    "apply_url",
+    "published_at",
+    "last_verified_at",
+    "salary_text",
+    "equity_mentioned",
+    "visa_sponsorship",
+    "work_authorization",
+    "required_skills_json",
+    "preferred_skills_json",
+    "technologies_json",
+    "enrichment_status",
+    "enrichment_confidence",
+    "enriched_at",
+}
 
 
 class JobRepository(BaseRepository[Job]):
@@ -139,6 +157,66 @@ class JobRepository(BaseRepository[Job]):
             .limit(limit)
         )
         return list(self.session.scalars(stmt).all())
+
+    def list_jobs_needing_enrichment(
+        self, limit: int = 50, offset: int = 0
+    ) -> list[Job]:
+        stmt = (
+            select(Job)
+            .where(
+                Job.enrichment_status.in_(
+                    {"not_enriched", "partially_enriched", "unresolved"}
+                )
+                | Job.last_verified_at.is_(None)
+            )
+            .where(Job.enrichment_status != "failed")
+            .order_by(
+                case((Job.enrichment_status == "not_enriched", 0), else_=1),
+                nullsfirst(Job.last_verified_at.asc()),
+                Job.created_at.asc(),
+            )
+            .offset(offset)
+            .limit(limit)
+        )
+        return list(self.session.scalars(stmt).all())
+
+    def mark_enrichment_pending(self, job_id: str) -> Job:
+        job = self.get_by_id(job_id)
+        if job is None:
+            raise ValueError("Job not found")
+        return self.update_job(job, {"enrichment_status": "pending"})
+
+    def update_enrichment_fields(self, job_id: str, fields: dict[str, Any]) -> Job:
+        unknown = set(fields) - ENRICHMENT_UPDATE_FIELDS
+        if unknown:
+            raise ValueError(f"Unsupported enrichment fields: {', '.join(sorted(unknown))}")
+        job = self.get_by_id(job_id)
+        if job is None:
+            raise ValueError("Job not found")
+        values = dict(fields)
+        status = values.get("enrichment_status")
+        checked_statuses = {
+            JobEnrichmentStatus.ENRICHED.value,
+            JobEnrichmentStatus.PARTIALLY_ENRICHED.value,
+            JobEnrichmentStatus.UNRESOLVED.value,
+        }
+        if status == JobEnrichmentStatus.ENRICHED.value and "enriched_at" not in values:
+            values["enriched_at"] = datetime.now(timezone.utc)
+        if status in checked_statuses and "last_verified_at" not in values:
+            values["last_verified_at"] = datetime.now(timezone.utc)
+        return self.update_job(job, values)
+
+    def mark_enrichment_failed(self, job_id: str) -> Job:
+        job = self.get_by_id(job_id)
+        if job is None:
+            raise ValueError("Job not found")
+        return self.update_job(job, {"enrichment_status": "failed"})
+
+    def mark_enrichment_unresolved(self, job_id: str) -> Job:
+        job = self.get_by_id(job_id)
+        if job is None:
+            raise ValueError("Job not found")
+        return self.update_job(job, {"enrichment_status": "unresolved"})
 
     def create_job(self, job: Job) -> Job:
         return self.create(job)
