@@ -135,6 +135,15 @@ class JobEnrichmentAttemptStatus(StrEnum):
     SKIPPED = "skipped"
 
 
+class JobSourceType(StrEnum):
+    YCOMBINATOR_JOB = "ycombinator_job"
+    ASHBY_JOB_BOARD = "ashby_job_board"
+    FIRST_PARTY_JOB_PAGE = "first_party_job_page"
+    GENERIC_EXTERNAL_JOB_PAGE = "generic_external_job_page"
+    UNSUPPORTED = "unsupported"
+    INVALID = "invalid"
+
+
 class RoleCategory(StrEnum):
     AI_ENGINEER = "ai_engineer"
     BACKEND_ENGINEER = "backend_engineer"

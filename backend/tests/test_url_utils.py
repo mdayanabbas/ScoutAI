@@ -1,3 +1,4 @@
+from app.jobs.job_source_detector import normalize_job_url
 from app.utils.urls import extract_domain, normalize_domain, normalize_url
 
 
@@ -16,3 +17,10 @@ def test_url_utils_handle_empty_input_safely():
     assert normalize_url("") == ""
     assert extract_domain("") == ""
     assert normalize_domain("") == ""
+
+
+def test_job_url_normalizer_preserves_meaningful_query_params():
+    normalized = normalize_job_url("https://jobs.examplecareers.com/openings/1?foo=bar&utm_medium=social")
+
+    assert normalized.valid is True
+    assert normalized.canonical_url == "https://jobs.examplecareers.com/openings/1?foo=bar"
