@@ -45,6 +45,7 @@ class Job(Base, UUIDMixin, TimestampMixin):
             RoleCategory,
             name="rolecategory",
             native_enum=False,
+            length=64,
             values_callable=lambda x: [e.value for e in x],
         ),
         default=RoleCategory.OTHER,

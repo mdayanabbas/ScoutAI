@@ -24,6 +24,40 @@ class JobEnrichmentAttemptRepository(BaseRepository[JobEnrichmentAttempt]):
         )
         return list(self.session.scalars(stmt).all())
 
+    def list_by_job_id_paginated(
+        self, job_id: str, *, limit: int = 20, offset: int = 0
+    ) -> list[JobEnrichmentAttempt]:
+        stmt = (
+            select(JobEnrichmentAttempt)
+            .where(JobEnrichmentAttempt.job_id == job_id)
+            .order_by(JobEnrichmentAttempt.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        return list(self.session.scalars(stmt).all())
+
+    def count_by_job_id(self, job_id: str) -> int:
+        from sqlalchemy import func
+
+        stmt = (
+            select(func.count())
+            .select_from(JobEnrichmentAttempt)
+            .where(JobEnrichmentAttempt.job_id == job_id)
+        )
+        return self.session.scalar(stmt) or 0
+
+    def get_running_for_job(self, job_id: str) -> JobEnrichmentAttempt | None:
+        stmt = (
+            select(JobEnrichmentAttempt)
+            .where(
+                JobEnrichmentAttempt.job_id == job_id,
+                JobEnrichmentAttempt.status == JobEnrichmentAttemptStatus.RUNNING.value,
+            )
+            .order_by(JobEnrichmentAttempt.created_at.desc())
+            .limit(1)
+        )
+        return self.session.scalar(stmt)
+
     def get_latest_for_job(self, job_id: str) -> JobEnrichmentAttempt | None:
         stmt = (
             select(JobEnrichmentAttempt)

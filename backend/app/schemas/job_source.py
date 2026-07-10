@@ -3,6 +3,7 @@ from pydantic import BaseModel
 
 class JobSourceDetectionRead(BaseModel):
     source_type: str
+    original_url: str | None = None
     canonical_url: str | None = None
     normalized_domain: str | None = None
     provider: str | None = None

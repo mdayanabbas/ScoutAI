@@ -41,6 +41,14 @@ class Settings(BaseSettings):
     YC_COMPANY_REQUEST_TIMEOUT_SECONDS: int = Field(default=10, gt=0)
     YC_COMPANY_MAX_RETRIES: int = Field(default=2, ge=0)
     YC_COMPANY_USER_AGENT: str = "ScoutAI/0.1 YC-company-resolver"
+    YC_JOB_REQUEST_TIMEOUT_SECONDS: int = Field(default=10, gt=0)
+    YC_JOB_MAX_REDIRECTS: int = Field(default=3, ge=0)
+    YC_JOB_MAX_RESPONSE_BYTES: int = Field(default=2_000_000, gt=0)
+    YC_JOB_USER_AGENT: str = "ScoutAI/0.1 job-enrichment"
+    YC_JOB_MAX_RETRIES: int = Field(default=1, ge=0)
+    JOB_ENRICHMENT_BATCH_DEFAULT_LIMIT: int = Field(default=10, ge=1)
+    JOB_ENRICHMENT_BATCH_MAX_LIMIT: int = Field(default=50, ge=1)
+    JOB_ENRICHMENT_BATCH_DELAY_MS: int = Field(default=0, ge=0)
     ASHBY_RESOLVER_ENABLED: bool = True
     ASHBY_POSTING_API_BASE_URL: str = (
         "https://api.ashbyhq.com/posting-api/job-board"
@@ -70,6 +78,8 @@ class Settings(BaseSettings):
     def validate_hacker_news_limits(self):
         if self.HACKER_NEWS_DEFAULT_LIMIT > self.HACKER_NEWS_MAX_LIMIT:
             self.HACKER_NEWS_DEFAULT_LIMIT = self.HACKER_NEWS_MAX_LIMIT
+        if self.JOB_ENRICHMENT_BATCH_DEFAULT_LIMIT > self.JOB_ENRICHMENT_BATCH_MAX_LIMIT:
+            self.JOB_ENRICHMENT_BATCH_DEFAULT_LIMIT = self.JOB_ENRICHMENT_BATCH_MAX_LIMIT
         return self
 
 
