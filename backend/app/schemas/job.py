@@ -392,3 +392,39 @@ class AshbyBoardExpansionRead(BaseModel):
     candidates: list[AshbyBoardExpansionCandidateRead] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     attempt_id: str | None = None
+
+
+class FirstPartyListingCandidateRead(BaseModel):
+    title: str | None = None
+    canonical_url: str | None = None
+    source_strategy: str | None = None
+    scope_score: float = 0.0
+    selected: bool = False
+    rejection_reason: str | None = None
+
+
+class FirstPartyListingChildRead(BaseModel):
+    job_id: str
+    title: str
+    job_url: str | None = None
+    role_category: str | None = None
+    location: str | None = None
+    remote_type: str | None = None
+    action: str
+    status: str
+
+
+class FirstPartyListingExpansionRead(BaseModel):
+    parent_job_id: str
+    status: str
+    reason: str
+    links_seen: int = 0
+    candidates_selected: int = 0
+    detail_pages_fetched: int = 0
+    jobs_created: int = 0
+    jobs_existing: int = 0
+    jobs_failed: int = 0
+    parent_deactivated: bool = False
+    children: list[FirstPartyListingChildRead] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    attempt_id: str | None = None
