@@ -67,6 +67,14 @@ class Settings(BaseSettings):
     FIRST_PARTY_JOB_RESPECT_ROBOTS: bool = True
     FIRST_PARTY_JOB_MAX_DESCRIPTION_CHARS: int = Field(default=30_000, gt=0)
     FIRST_PARTY_JOB_ALLOWED_CONTENT_TYPES: str = "text/html,application/xhtml+xml"
+    FIRST_PARTY_LISTING_MAX_LINKS: int = Field(default=100, gt=0)
+    FIRST_PARTY_LISTING_MAX_CREATE: int = Field(default=25, gt=0)
+    FIRST_PARTY_LISTING_MAX_DETAIL_FETCHES: int = Field(default=25, ge=0)
+    FIRST_PARTY_LISTING_MIN_LINK_CONFIDENCE: float = Field(default=0.75, ge=0, le=1)
+    FIRST_PARTY_LISTING_MIN_SCOPE_SCORE: float = Field(default=0.70, ge=0, le=1)
+    FIRST_PARTY_LISTING_ALLOW_BROAD_HIRING: bool = True
+    FIRST_PARTY_LISTING_REQUIRE_SAME_DOMAIN_DETAILS: bool = True
+    FIRST_PARTY_LISTING_DELAY_MS: int = Field(default=0, ge=0)
     JOB_ENRICHMENT_BATCH_DEFAULT_LIMIT: int = Field(default=10, ge=1)
     JOB_ENRICHMENT_BATCH_MAX_LIMIT: int = Field(default=50, ge=1)
     JOB_ENRICHMENT_BATCH_DELAY_MS: int = Field(default=0, ge=0)
