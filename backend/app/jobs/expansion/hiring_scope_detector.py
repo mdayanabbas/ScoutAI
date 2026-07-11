@@ -77,6 +77,36 @@ class HiringScopeDetector:
                 confidence=0.88,
                 evidence=evidence,
             )
+        if _has_any(text, ("product and design", "product roles", "product team", "product management")):
+            return HiringScopeResult(
+                "product",
+                role_categories=["product_manager", "product_engineer"],
+                department_terms=["product"],
+                team_terms=["product"],
+                title_terms=["product manager", "product engineer", "product lead"],
+                confidence=0.86,
+                evidence=evidence,
+            )
+        if _has_any(text, ("design roles", "design team", "product design", "ux team", "ui team")):
+            return HiringScopeResult(
+                "design",
+                role_categories=["other"],
+                department_terms=["design", "ux", "ui"],
+                team_terms=["design", "ux", "ui"],
+                title_terms=["product designer", "ux", "ui", "design systems", "designer"],
+                confidence=0.84,
+                evidence=evidence,
+            )
+        if _has_any(text, ("operations roles", "operations team", "people ops", "business operations")):
+            return HiringScopeResult(
+                "operations",
+                role_categories=["operations"],
+                department_terms=["operations", "people", "business operations"],
+                team_terms=["operations", "people ops", "business ops"],
+                title_terms=["operations", "people operations", "business operations"],
+                confidence=0.84,
+                evidence=evidence,
+            )
         if _has_any(text, ("open roles", "join our team", "company is hiring", "is hiring", "several positions", "multiple roles")):
             return HiringScopeResult(
                 "all_roles",

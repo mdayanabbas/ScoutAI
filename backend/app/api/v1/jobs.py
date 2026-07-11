@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -13,6 +13,7 @@ from app.repositories.job_enrichment_attempt_repository import (
 from app.schemas.common import MessageResponse, PaginatedResponse
 from app.schemas.job import (
     AshbyBoardExpansionRead,
+    FirstPartyListingExpansionRead,
     JobBatchEnrichmentRead,
     JobBatchEnrichmentRequest,
     JobCreate,
@@ -24,6 +25,9 @@ from app.schemas.job import (
     JobUpdate,
 )
 from app.schemas.job_source import JobSourceDetectionRead
+from app.services.first_party_listing_expansion_service import (
+    FirstPartyListingExpansionService,
+)
 from app.services.job_batch_enrichment_service import JobBatchEnrichmentService
 from app.services.job_detail_enrichment_service import JobDetailEnrichmentService
 from app.services.ashby_board_expansion_service import AshbyBoardExpansionService
@@ -54,6 +58,12 @@ def get_ashby_board_expansion_service(
     db: Session = Depends(get_db),
 ) -> AshbyBoardExpansionService:
     return AshbyBoardExpansionService(db)
+
+
+def get_first_party_listing_expansion_service(
+    db: Session = Depends(get_db),
+) -> FirstPartyListingExpansionService:
+    return FirstPartyListingExpansionService(db)
 
 
 @router.post(
@@ -216,26 +226,6 @@ async def enrich_job(
         if result.attempt_id
         else None
     )
-
-
-@router.post(
-    "/jobs/{job_id}/expand-ashby-board",
-    response_model=AshbyBoardExpansionRead,
-    summary="Expand one Ashby board-level job into exact child jobs",
-)
-async def expand_ashby_board(
-    job_id: str,
-    db: Session = Depends(get_db),
-    job_service: JobService = Depends(get_job_service),
-    service: AshbyBoardExpansionService = Depends(get_ashby_board_expansion_service),
-):
-    job_service.get_job(job_id)
-    running = JobEnrichmentAttemptRepository(db).get_running_for_job(job_id)
-    if running is not None:
-        logger.info("Concurrent board expansion rejected", extra={"job_id": job_id})
-        raise ConflictError("Job enrichment is already running")
-    logger.info("Ashby board expansion requested", extra={"job_id": job_id})
-    return await service.expand_job_board(job_id)
     refreshed_job = job_service.get_job(job_id)
     logger.info(
         "API enrichment completed",
@@ -256,6 +246,49 @@ async def expand_ashby_board(
         attempt=attempt,
         job=refreshed_job if result.status in {"enriched", "partially_enriched"} else None,
     )
+
+
+@router.post(
+    "/jobs/{job_id}/expand-ashby-board",
+    response_model=AshbyBoardExpansionRead,
+    summary="Expand one Ashby board-level job into exact child jobs",
+)
+async def expand_ashby_board(
+    job_id: str,
+    db: Session = Depends(get_db),
+    job_service: JobService = Depends(get_job_service),
+    service: AshbyBoardExpansionService = Depends(get_ashby_board_expansion_service),
+):
+    job_service.get_job(job_id)
+    running = JobEnrichmentAttemptRepository(db).get_running_for_job(job_id)
+    if running is not None:
+        logger.info("Concurrent board expansion rejected", extra={"job_id": job_id})
+        raise ConflictError("Job enrichment is already running")
+    logger.info("Ashby board expansion requested", extra={"job_id": job_id})
+    return await service.expand_job_board(job_id)
+
+
+@router.post(
+    "/jobs/{job_id}/expand-first-party-listing",
+    response_model=FirstPartyListingExpansionRead,
+    summary="Expand one first-party careers listing into exact child jobs",
+)
+async def expand_first_party_listing(
+    job_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    job_service: JobService = Depends(get_job_service),
+    service: FirstPartyListingExpansionService = Depends(get_first_party_listing_expansion_service),
+):
+    job_service.get_job(job_id)
+    if (await request.body()).strip():
+        raise ValidationAppError("Request body is not supported", {"body": "not accepted"})
+    running = JobEnrichmentAttemptRepository(db).get_running_for_job(job_id)
+    if running is not None:
+        logger.info("Concurrent first-party listing expansion rejected", extra={"job_id": job_id})
+        raise ConflictError("Job enrichment is already running")
+    logger.info("First-party listing expansion requested", extra={"job_id": job_id})
+    return await service.expand_listing(job_id)
 
 
 @router.get(
