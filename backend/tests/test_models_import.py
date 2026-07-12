@@ -12,6 +12,7 @@ def test_all_models_importable():
         JobBoardExpansionLink,
         JobEnrichmentAttempt,
         JobDiscoveryLink,
+        JobMatchingProfile,
         TechStackItem,
         UserProfile,
     )
@@ -30,6 +31,7 @@ def test_all_models_importable():
             JobBoardExpansionLink,
             JobEnrichmentAttempt,
             JobDiscoveryLink,
+            JobMatchingProfile,
             TechStackItem,
             UserProfile,
         ]

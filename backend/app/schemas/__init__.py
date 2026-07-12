@@ -80,6 +80,14 @@ from app.schemas.job import (
     JobUpdate,
 )
 from app.schemas.job_source import JobSourceDetectionRead
+from app.schemas.job_matching_profile import (
+    JobMatchingProfileCreate,
+    JobMatchingProfileRead,
+    JobMatchingProfileSummaryRead,
+    JobMatchingProfileUpdate,
+    MatchingSkillInput,
+    MatchingTechnologyInput,
+)
 from app.schemas.tech_stack_item import (
     TechStackItemBase,
     TechStackItemCreate,
@@ -146,6 +154,12 @@ __all__ = [
     "JobListItem",
     "JobRead",
     "JobSourceDetectionRead",
+    "JobMatchingProfileCreate",
+    "JobMatchingProfileRead",
+    "JobMatchingProfileSummaryRead",
+    "JobMatchingProfileUpdate",
+    "MatchingSkillInput",
+    "MatchingTechnologyInput",
     "JobUpdate",
     "MessageResponse",
     "ManualCompanyDomainInput",
