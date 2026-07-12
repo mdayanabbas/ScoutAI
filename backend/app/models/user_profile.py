@@ -1,8 +1,13 @@
+from typing import TYPE_CHECKING
+
 from sqlalchemy import Enum, JSON
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDMixin
 from app.utils.enums import RemoteType
+
+if TYPE_CHECKING:
+    from app.models.job_matching_profile import JobMatchingProfile
 
 
 class UserProfile(Base, UUIDMixin, TimestampMixin):
@@ -31,4 +36,10 @@ class UserProfile(Base, UUIDMixin, TimestampMixin):
     )
     preferred_company_sizes: Mapped[list[str] | None] = mapped_column(
         JSON, default=None
+    )
+    job_matching_profile: Mapped["JobMatchingProfile | None"] = relationship(
+        back_populates="user_profile",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
     )

@@ -10,6 +10,7 @@ from app.services.discovery_job_ingestion_service import DiscoveryJobIngestionSe
 from app.services.job_batch_enrichment_service import JobBatchEnrichmentService
 from app.services.ashby_board_expansion_service import AshbyBoardExpansionService
 from app.services.job_detail_enrichment_service import JobDetailEnrichmentService
+from app.services.job_matching_profile_service import JobMatchingProfileService
 from app.services.job_service import JobService
 from app.services.tech_stack_service import TechStackService
 from app.services.user_profile_service import UserProfileService
@@ -25,6 +26,7 @@ __all__ = [
     "JobBatchEnrichmentService",
     "AshbyBoardExpansionService",
     "JobDetailEnrichmentService",
+    "JobMatchingProfileService",
     "JobService",
     "TechStackService",
     "UserProfileService",
