@@ -28,7 +28,8 @@ def _setup(db_session):
     user = UserProfileRepository(db_session).create_profile(UserProfile(display_name="Abbas"))
     profile = JobMatchingProfile(
         user_profile_id=user.id,
-        target_titles_json=["Software Engineer"],
+        target_titles_json=["Software Engineer", "AI Engineer", "ML Engineer"],
+        target_role_categories_json=["software_engineer", "ai_engineer", "ml_engineer"],
         accepted_employment_types_json=["full_time"],
         preferred_countries_json=["India"],
         work_authorization_countries_json=["India"],
@@ -69,6 +70,24 @@ def _setup(db_session):
     return good, bad
 
 
+def _create_match_job(db_session, company, **kwargs):
+    values = {
+        "company_id": company.id,
+        "title": "Software Engineer",
+        "normalized_title": "software engineer",
+        "role_category": "software_engineer",
+        "description": "Remote worldwide. Build APIs.",
+        "remote_type": "remote_worldwide",
+        "experience_min": 1,
+        "employment_type": "full_time",
+        "job_url": f"https://{company.normalized_domain}/jobs/{abs(hash(str(kwargs))) % 100000}",
+        "status": JobStatus.ACTIVE,
+        "enrichment_status": "enriched",
+    }
+    values.update(kwargs)
+    return JobRepository(db_session).create_job(Job(**values))
+
+
 @pytest.mark.asyncio
 async def test_job_match_api_scores_lists_and_gets(db_session, match_api_client):
     good, bad = _setup(db_session)
@@ -89,3 +108,64 @@ async def test_job_match_api_scores_lists_and_gets(db_session, match_api_client)
     assert len(included.json()["items"]) == 2
     assert one.status_code == 200
     assert one.json()["job_id"] == good.id
+
+
+@pytest.mark.asyncio
+async def test_default_recommendations_exclude_invalid_onsite_and_unknown_remote(db_session, match_api_client):
+    _setup(db_session)
+    company = CompanyRepository(db_session).create_company(Company(name="Recommendation Co", normalized_domain="recommendation.example"))
+    worldwide = _create_match_job(db_session, company, title="AI Engineer", role_category="ai_engineer")
+    india = _create_match_job(
+        db_session,
+        company,
+        title="ML Engineer",
+        role_category="ml_engineer",
+        description="Remote in India. Build models.",
+        remote_type="unknown",
+        job_url="https://recommendation.example/jobs/ml",
+    )
+    wildcard = _create_match_job(
+        db_session,
+        company,
+        title="Software Engineer",
+        location="San Francisco",
+        description="Build developer tools.",
+        remote_type="unknown",
+        job_url="https://recommendation.example/jobs/wildcard",
+    )
+    acme = _create_match_job(
+        db_session,
+        company,
+        title="Software Engineer",
+        job_url="bjasvhcjhv",
+        apply_url=None,
+    )
+    nox = _create_match_job(
+        db_session,
+        company,
+        title="Software Engineer",
+        location="Detroit",
+        description="This role is full time, in person in Detroit.",
+        remote_type="unknown",
+        job_url="https://recommendation.example/jobs/nox",
+    )
+
+    scored = await match_api_client.post(
+        "/api/v1/job-matches/score",
+        json={"job_ids": [worldwide.id, india.id, wildcard.id, acme.id, nox.id], "force": True},
+    )
+    default_list = await match_api_client.get("/api/v1/job-matches")
+    with_unknown = await match_api_client.get("/api/v1/job-matches", params={"include_remote_unknown": "true"})
+
+    assert scored.status_code == 200
+    assert all(item["reason"] for item in scored.json()["results"] if item["status"] == "scored")
+    default_ids = [item["job_id"] for item in default_list.json()["items"]]
+    assert worldwide.id in default_ids
+    assert india.id in default_ids
+    assert wildcard.id not in default_ids
+    assert acme.id not in default_ids
+    assert nox.id not in default_ids
+    assert default_list.json()["items"][0]["valid_job_url"] is True
+    unknown_ids = [item["job_id"] for item in with_unknown.json()["items"]]
+    assert wildcard.id in unknown_ids
+    assert unknown_ids.index(wildcard.id) > unknown_ids.index(worldwide.id)
