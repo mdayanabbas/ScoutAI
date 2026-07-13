@@ -63,3 +63,19 @@ def test_parse_ashby_posting_identifier_supports_equivalent_urls():
     assert parse_ashby_posting_identifier("https://jobs.ashbyhq.com/lago/abc123") == "abc123"
     assert parse_ashby_posting_identifier("https://jobs.ashbyhq.com/lago") is None
 
+
+def test_parser_repairs_text_and_strips_apply_suffix():
+    posting = AshbyPublicJobPosting(
+        id="abc123",
+        title="Electrical Engineer, Staff Apply",
+        location="Remote",
+        description_plain="YouÃ¢â‚¬â„¢ll build hardware tools with Docker.",
+        job_url="https://jobs.ashbyhq.com/lago/abc123?utm_source=hn",
+    )
+
+    result = AshbyJobParser().parse_posting(posting, board_slug="lago")
+
+    assert result.title.value == "Electrical Engineer, Staff"
+    assert result.description.value == "You\u2019ll build hardware tools with Docker."
+    assert result.role_category.value == "other"
+    assert result.job_url.value == "https://jobs.ashbyhq.com/lago/abc123"

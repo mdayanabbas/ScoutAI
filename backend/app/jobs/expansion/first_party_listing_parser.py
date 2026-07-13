@@ -16,19 +16,23 @@ from app.jobs.job_source_detector import (
     normalize_job_url,
     parse_ashby_job_url,
 )
+from app.utils.text import repair_mojibake, strip_job_title_action_suffix
 
 GENERIC_PATHS = {"/careers", "/jobs", "/openings", "/join-us", "/work-with-us", "/careers/jobs"}
 BLOCKED_PATH_TOKENS = {
     "account",
+    "accounts",
     "admin",
-    "blog",
-    "customer",
+    "auth",
     "login",
     "logout",
+    "oauth",
     "privacy",
+    "register",
+    "settings",
+    "sign-in",
     "signin",
     "signup",
-    "story",
     "terms",
 }
 EXTERNAL_ATS_DOMAINS = {
@@ -42,7 +46,7 @@ EXTERNAL_ATS_DOMAINS = {
 }
 ROLE_WORD_RE = re.compile(
     r"\b(engineer|developer|designer|product manager|account executive|sales|marketing|"
-    r"growth|operations|recruiter|data scientist|analyst|lead|manager|architect|"
+    r"growth|operations|recruiter|data scientist|scientist|analyst|lead|manager|architect|"
     r"customer success|solutions|security|devops|sre|founding)\b",
     re.I,
 )
@@ -286,11 +290,19 @@ def _candidate_url(raw_url: str | None, canonical_url: str, company_domain: str)
     path = (normalized.path or "").lower()
     if path in GENERIC_PATHS:
         return _URLResult(normalized.canonical_url, "generic_listing_path")
-    if any(f"/{token}" in path or path.endswith(f"/{token}") for token in BLOCKED_PATH_TOKENS):
+    if any(segment in BLOCKED_PATH_TOKENS for segment in _path_segments(path)):
         return _URLResult(normalized.canonical_url, "blocked_path")
     if re.search(r"\.(pdf|doc|docx|zip)$", path):
         return _URLResult(normalized.canonical_url, "file_download")
     return _URLResult(normalized.canonical_url)
+
+
+def _path_segments(path: str) -> list[str]:
+    return [
+        unquote(segment).strip().lower().replace("_", "-")
+        for segment in path.split("/")
+        if segment.strip()
+    ]
 
 
 def _jobposting_json_ld(html: str) -> list[dict[str, Any]]:
@@ -476,7 +488,7 @@ def _clean_title(value: Any, company_name: str | None) -> str:
         text = re.sub(rf"\s+[-|]\s+{re.escape(company_name)}.*$", "", text, flags=re.I)
         text = re.sub(rf"\s+at\s+{re.escape(company_name)}.*$", "", text, flags=re.I)
     text = re.sub(r"\s+[-|]\s+(careers|jobs|job openings).*$", "", text, flags=re.I)
-    return unquote(text).strip(" -|")
+    return strip_job_title_action_suffix(unquote(text).strip(" -|")) or ""
 
 
 def _looks_like_role(title: str | None) -> bool:
@@ -544,7 +556,7 @@ def _excerpt(value: str, maximum: int = 500) -> str | None:
 
 
 def _normalize_ws(value: Any) -> str:
-    return re.sub(r"\s+", " ", str(value or "")).strip()
+    return re.sub(r"\s+", " ", repair_mojibake(str(value or "")) or "").strip()
 
 
 def _norm(value: Any) -> str:

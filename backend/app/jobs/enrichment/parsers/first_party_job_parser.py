@@ -11,9 +11,25 @@ from app.jobs.enrichment.models import JobDetailExtractionResult, JobFieldValue
 from app.jobs.enrichment.parsers.ycombinator_job_parser import classify_role_category
 from app.jobs.job_source_detector import compare_registrable_domains, normalize_job_url
 from app.utils.enums import RemoteType
+from app.utils.text import (
+    dedupe_meaningful_entries,
+    focused_authorization_fields,
+    repair_mojibake,
+    split_structured_skill_text,
+    strip_job_title_action_suffix,
+)
 
 PROVIDER = "first_party_job_page"
 GENERIC_TITLES = {"careers", "jobs", "open roles", "join our team", "current openings", "open positions"}
+GENERIC_SLUGS = {
+    "apply",
+    "careers",
+    "details",
+    "jobs",
+    "join-us",
+    "openings",
+    "work-with-us",
+}
 CURRENCY_SYMBOLS = {"$": "USD", "\u20ac": "EUR", "\u00a3": "GBP"}
 TECH_WORDS = {
     "AWS",
@@ -68,25 +84,34 @@ class FirstPartyJobParser:
         identity_reason = _identity_mismatch(json_ld, soup, company_name, company_domain)
         if identity_reason:
             return _empty(source_url, canonical_url, identity_reason, evidence=evidence)
-        if listing_signals and not json_ld:
-            return _empty(source_url, canonical_url, "first_party_listing_page_requires_expansion", evidence=evidence)
-
         for tag in soup(["script", "style", "noscript", "svg", "form", "nav", "footer", "header", "aside"]):
             tag.decompose()
         labels = _labelled_fields(soup)
         text = _clean_description(soup.get_text("\n"))
         title = _title_field(json_ld, soup, canonical_url, company_name)
+        if listing_signals and not json_ld and not title:
+            return _empty(source_url, canonical_url, "first_party_listing_page_requires_expansion", evidence=evidence)
         if title and str(title.value).strip().lower() in GENERIC_TITLES:
             return _empty(source_url, canonical_url, "first_party_listing_page_requires_expansion", evidence=evidence)
         description = _description_field(json_ld, soup, text)
         location = _location_field(json_ld, labels)
         remote_type = _remote_type_field(json_ld, labels, location)
         employment_type = _employment_type_field(json_ld, labels)
-        experience_min, experience_max, seniority = _experience_fields(json_ld, labels, text, title.value if title else None)
+        experience_min, experience_max, seniority = _experience_fields(
+            json_ld,
+            labels,
+            description.value if description else None,
+            text,
+            title.value if title else None,
+        )
         salary_min, salary_max, salary_currency, salary_text = _salary_fields(json_ld, labels, text)
         equity = _equity_field(labels, text)
         visa, work_auth = _visa_fields(labels, text)
-        required_skills, technologies = _skills_fields(json_ld, labels, text)
+        required_skills, technologies = _skills_fields(
+            json_ld,
+            labels,
+            "\n".join(item for item in (description.value if description else None, text) if item),
+        )
         preferred_skills = _preferred_skills_field(text)
         published_at = _published_at_field(json_ld, labels)
         apply_url = _apply_url_field(json_ld, soup, canonical_url, company_domain)
@@ -128,7 +153,7 @@ class FirstPartyJobParser:
         evidence["overall_confidence"] = round(overall, 3)
         evidence["detected_labels"] = sorted(labels)
         evidence["extracted_field_names"] = sorted(confidence)
-        if not title or title.confidence < 0.75:
+        if not title or (title.confidence < 0.75 and title.source != "url_slug"):
             return _empty(source_url, canonical_url, "first_party_job_data_missing", evidence=evidence)
         return JobDetailExtractionResult(
             success=True,
@@ -314,7 +339,7 @@ def _description_field(json_ld: dict[str, Any], soup: BeautifulSoup, visible_tex
 
 def _labelled_fields(soup: BeautifulSoup) -> dict[str, str]:
     labels: dict[str, str] = {}
-    pattern = re.compile(r"^(Location|Job type|Type|Employment|Experience|Department|Role|Compensation|Salary|Skills?|Visa)\s*[:\-]\s*(.+)$", re.I)
+    pattern = re.compile(r"^(Location|Job type|Type|Employment|Experience|Department|Role|Compensation|Salary|Skills?|Visa|Sponsorship|Work authorization)\s*[:\-]\s*(.+)$", re.I)
     for tag in soup.find_all(["li", "p", "div", "span"]):
         text = _normalize_ws(tag.get_text(" "))
         if len(text) > 600:
@@ -343,6 +368,8 @@ def _label_key(value: str) -> str:
         "skills": "skills",
         "skill": "skills",
         "visa": "visa",
+        "sponsorship": "sponsorship",
+        "work authorization": "work_authorization",
     }.get(_normalize_ws(value).lower(), "")
 
 
@@ -402,15 +429,51 @@ def _normalize_employment_type(value: str) -> str | None:
     return "other" if value.strip() else None
 
 
-def _experience_fields(json_ld: dict[str, Any], labels: dict[str, str], text: str, title: str | None) -> tuple[JobFieldValue | None, JobFieldValue | None, JobFieldValue | None]:
-    raw = " ".join(str(item or "") for item in (json_ld.get("experienceRequirements"), labels.get("experience"), text[:4000]))
-    match = re.search(r"\b(\d+)\s*(?:-|to|\u2013)\s*(\d+)\s*\+?\s+years?", raw, re.I)
+def _experience_fields(
+    json_ld: dict[str, Any],
+    labels: dict[str, str],
+    description_text: str | None,
+    visible_text: str,
+    title: str | None,
+) -> tuple[JobFieldValue | None, JobFieldValue | None, JobFieldValue | None]:
+    sources = [
+        ("experience_requirements", json_ld.get("experienceRequirements"), 0.95),
+        ("qualifications", json_ld.get("qualifications"), 0.92),
+        ("jobposting_description", description_text, 0.86),
+        ("labelled_experience", labels.get("experience"), 0.84),
+        ("visible_text", visible_text[:4000], 0.82),
+    ]
+    seniority_text = " ".join(str(value or "") for _, value, _ in sources)
+    for source, value, confidence in sources:
+        parsed = _parse_experience_text(value)
+        if parsed:
+            minimum, maximum = parsed
+            return _field(minimum, confidence, source), _field(maximum, confidence, source) if maximum is not None else None, _seniority(title, seniority_text)
+    return None, None, _seniority(title, seniority_text)
+
+
+def _parse_experience_text(value: Any) -> tuple[int, int | None] | None:
+    if isinstance(value, dict):
+        raw = " ".join(str(item or "") for item in value.values())
+    elif isinstance(value, list):
+        raw = " ".join(str(item or "") for item in value)
+    else:
+        raw = str(value or "")
+    raw = _html_to_text(raw)
+    if not raw:
+        return None
+    match = re.search(r"\b(\d{1,2})\s*(?:-|to|\u2013)\s*(\d{1,2})\s*\+?\s+years?(?:\s+of\s+experience)?\b", raw, re.I)
     if match:
-        return _field(int(match.group(1)), 0.9, "experience_text"), _field(int(match.group(2)), 0.9, "experience_text"), _seniority(title, raw)
-    match = re.search(r"\b(\d+)\s*\+\s+years?", raw, re.I)
+        minimum = int(match.group(1))
+        maximum = int(match.group(2))
+        if 0 <= minimum <= maximum <= 60:
+            return minimum, maximum
+    match = re.search(r"\b(\d{1,2})\s*\+\s+years?(?:\s+of\s+experience)?\b", raw, re.I)
     if match:
-        return _field(int(match.group(1)), 0.9, "experience_text"), None, _seniority(title, raw)
-    return None, None, _seniority(title, raw)
+        minimum = int(match.group(1))
+        if 0 <= minimum <= 60:
+            return minimum, None
+    return None
 
 
 def _seniority(title: str | None, text: str) -> JobFieldValue | None:
@@ -496,33 +559,36 @@ def _equity_field(labels: dict[str, str], text: str) -> JobFieldValue | None:
 
 
 def _visa_fields(labels: dict[str, str], text: str) -> tuple[JobFieldValue | None, JobFieldValue | None]:
-    haystack = " ".join([labels.get("visa", ""), text[:4000]])
-    lower = haystack.lower()
-    if "unable to sponsor" in lower or "no visa" in lower:
-        return _field("does_not_sponsor", 0.9, "visa_text"), None
-    if "visa sponsorship available" in lower or "will sponsor" in lower:
-        return _field("sponsors", 0.9, "visa_text"), None
-    if "authorized to work" in lower or "work authorization" in lower:
-        return _field("existing_authorization_required", 0.85, "visa_text"), _field(haystack[:255], 0.8, "authorization_text")
-    return None, None
+    visa, focused = focused_authorization_fields(labels, text)
+    return (
+        _field(visa, 0.9, "authorization_evidence") if visa else None,
+        _field(focused, 0.85, "authorization_evidence") if focused else None,
+    )
 
 
 def _skills_fields(json_ld: dict[str, Any], labels: dict[str, str], text: str) -> tuple[JobFieldValue | None, JobFieldValue | None]:
     raw = json_ld.get("skills") or labels.get("skills") or ""
-    if isinstance(raw, list):
-        values = raw
-    else:
-        values = re.split(r"[,;|/]", str(raw))
-    skills = _dedupe(values)
-    technologies = [word for word in sorted(TECH_WORDS) if re.search(rf"(?<![\w.+#]){re.escape(word)}(?![\w.+#])", text, re.I)]
+    skills = _dedupe(split_structured_skill_text(raw))
+    technologies = [word for word in sorted(TECH_WORDS) if re.search(rf"(?<![\w+#]){re.escape(word)}(?![\w+#])", text, re.I)]
     return _field(skills, 0.85, "skills") if skills else None, _field(technologies, 0.75, "technology_text") if technologies else None
 
 
 def _preferred_skills_field(text: str) -> JobFieldValue | None:
-    match = re.search(r"(?is)(nice to have|preferred qualifications?)\s*[:\n]\s*(.+?)(?:\n[A-Z][^\n]{1,60}\n|$)", text)
-    if not match:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    start = None
+    for index, line in enumerate(lines):
+        if re.match(r"(?i)^(nice to have|preferred qualifications?)\s*:?\s*$", line):
+            start = index + 1
+            break
+    if start is None:
         return None
-    return _field(_dedupe(re.split(r"[,;\n|-]", match.group(2)))[:20], 0.75, "preferred_section")
+    collected: list[str] = []
+    for line in lines[start:]:
+        if re.match(r"(?i)^(about|benefits|compensation|requirements|responsibilities|what you.ll do)\s*:?\s*$", line):
+            break
+        collected.append(line)
+    skills = _dedupe(collected)[:20]
+    return _field(skills, 0.75, "preferred_section") if skills else None
 
 
 def _published_at_field(json_ld: dict[str, Any], labels: dict[str, str]) -> JobFieldValue | None:
@@ -563,18 +629,19 @@ def _clean_title(value: Any, company_name: str | None) -> str:
         text = re.sub(rf"\s+[-|]\s+{re.escape(company_name)}.*$", "", text, flags=re.I)
         text = re.sub(rf"\s+at\s+{re.escape(company_name)}.*$", "", text, flags=re.I)
     text = re.sub(r"\s+[-|]\s+(careers|jobs).*$", "", text, flags=re.I)
-    return text.strip(" -|")
+    return strip_job_title_action_suffix(text.strip(" -|")) or ""
 
 
 def _title_from_slug(canonical_url: str) -> str | None:
     path = normalize_job_url(canonical_url).path or ""
     slug = unquote(path.rstrip("/").split("/")[-1])
-    if not slug or slug.lower() in {"careers", "jobs", "openings"}:
+    slug_key = slug.lower().strip()
+    if not slug_key or slug_key in GENERIC_SLUGS or slug_key.isdigit():
         return None
-    words = [word for word in re.split(r"[-_]+", slug) if word and not word.isdigit()]
+    words = [word for word in re.split(r"[-_]+", slug_key) if word and not word.isdigit()]
     if len(words) < 2:
         return None
-    return " ".join(word.upper() if word in {"ai", "ml"} else word.capitalize() for word in words)
+    return " ".join(word.upper() if word in {"ai", "api", "ml", "nlp", "qa", "sre", "ui", "ux"} else "DevOps" if word == "devops" else word.capitalize() for word in words)
 
 
 def _html_to_text(value: str) -> str:
@@ -606,24 +673,11 @@ def _bounded_description(value: str) -> str:
 
 
 def _dedupe(items: list[Any]) -> list[str]:
-    result: list[str] = []
-    seen: set[str] = set()
-    for item in items:
-        cleaned = _normalize_ws(item).strip(" -*")
-        if not cleaned or len(cleaned) > 80:
-            continue
-        key = cleaned.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        result.append(cleaned)
-        if len(result) >= 30:
-            break
-    return result
+    return dedupe_meaningful_entries(items, maximum=30, max_length=120)
 
 
 def _normalize_ws(value: Any) -> str:
-    return re.sub(r"\s+", " ", str(value or "")).strip()
+    return re.sub(r"\s+", " ", repair_mojibake(str(value or "")) or "").strip()
 
 
 def _norm(value: Any) -> str:

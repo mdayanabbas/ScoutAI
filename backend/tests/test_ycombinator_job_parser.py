@@ -120,3 +120,43 @@ def test_role_classification_current_examples():
     assert classify_role_category("Marketing Lead") == "marketing"
     assert classify_role_category("Developer Advocate & Partnerships (DevRel)") == "developer_advocate"
     assert classify_role_category("Office Champion") == "other"
+
+
+def test_authorization_focus_ignores_navigation_and_clearance_is_restricted():
+    html = _html(
+        labels="",
+        description="""
+        Open menu About YC Interview Guide
+        U.S. citizenship and eligibility for TS/SCI with full-scope polygraph are required.
+        Recommended jobs Footer
+        """,
+    )
+
+    result = YCombinatorJobParser().parse(html, source_url=URL, canonical_url=URL)
+
+    assert result.visa_sponsorship.value == "restricted"
+    assert "U.S. citizenship" in result.work_authorization.value
+    assert "Open menu" not in result.work_authorization.value
+    assert len(result.work_authorization.value) <= 500
+
+
+def test_absent_authorization_returns_null_and_visa_sponsorship_detects_immigration_only():
+    absent = YCombinatorJobParser().parse(_html(description="Build APIs."), source_url=URL, canonical_url=URL)
+    clearance = YCombinatorJobParser().parse(_html(description="We will sponsor new clearances for this role."), source_url=URL, canonical_url=URL)
+    immigration = YCombinatorJobParser().parse(_html(labels="<dt>Visa</dt><dd>Visa sponsorship available.</dd>"), source_url=URL, canonical_url=URL)
+
+    assert absent.work_authorization is None
+    assert clearance.visa_sponsorship is None
+    assert immigration.visa_sponsorship.value == "sponsors"
+
+
+def test_role_classification_conservative_engineering_titles():
+    assert classify_role_category("Software Engineer") == "software_engineer"
+    assert classify_role_category("Backend Engineer") == "backend_engineer"
+    assert classify_role_category("Electrical Engineer") == "other"
+    assert classify_role_category("Robotics Engineer") == "other"
+    assert classify_role_category("Perception Engineer") == "other"
+    assert classify_role_category("Embedded Engineer") == "other"
+    assert classify_role_category("Embedded Software Engineer") == "software_engineer"
+    assert classify_role_category("Robotics Software Engineer") == "software_engineer"
+    assert classify_role_category("Machinist") == "other"

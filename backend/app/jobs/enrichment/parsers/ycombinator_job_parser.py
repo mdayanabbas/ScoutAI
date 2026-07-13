@@ -10,6 +10,13 @@ from bs4 import BeautifulSoup
 from app.jobs.enrichment.models import JobDetailExtractionResult, JobFieldValue
 from app.jobs.job_source_detector import normalize_job_url, parse_yc_job_url
 from app.utils.enums import RemoteType, RoleCategory
+from app.utils.text import (
+    dedupe_meaningful_entries,
+    focused_authorization_fields,
+    repair_mojibake,
+    split_structured_skill_text,
+    strip_job_title_action_suffix,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +80,7 @@ class YCombinatorJobParser:
         preferred_skills = _preferred_skills_field(text)
         published_at = _published_at_field(json_ld)
         apply_url = _apply_url_field(json_ld, soup, canonical_url)
+        job_url = _field(parse_yc_job_url(canonical_url).canonical_url if parse_yc_job_url(canonical_url) else normalize_job_url(canonical_url).canonical_url, 0.98, "canonical_yc_job")
         raw_role = _raw_role_field(labels)
         role_category = _role_category_field(title, raw_role, description)
         remote_type = _remote_type_field(location, labels)
@@ -93,6 +101,7 @@ class YCombinatorJobParser:
             "salary_text": salary_text,
             "equity_mentioned": equity,
             "apply_url": apply_url,
+            "job_url": job_url,
             "visa_sponsorship": visa,
             "work_authorization": work_auth,
             "required_skills": required_skills,
@@ -141,6 +150,7 @@ class YCombinatorJobParser:
             salary_text=salary_text,
             equity_mentioned=equity,
             apply_url=apply_url,
+            job_url=job_url,
             visa_sponsorship=visa,
             work_authorization=work_auth,
             required_skills=required_skills,
@@ -168,6 +178,8 @@ def classify_role_category(title: str | None, role: str | None = None, descripti
         return "product_manager"
     if "founding product engineer" in exact or "product engineer" in exact:
         return RoleCategory.PRODUCT_ENGINEER.value
+    if re.search(r"\bfounding engineer\b", exact):
+        return RoleCategory.SOFTWARE_ENGINEER.value
     if "full stack" in exact or "full-stack" in exact:
         return RoleCategory.FULL_STACK_ENGINEER.value
     if "frontend" in exact or "front end" in exact:
@@ -188,7 +200,15 @@ def classify_role_category(title: str | None, role: str | None = None, descripti
         return "forward_deployed_engineer"
     if "operations" in exact:
         return "operations"
-    if "engineer" in exact or "software" in exact:
+    if (
+        "software engineer" in exact
+        or "software developer" in exact
+        or "application developer" in exact
+        or "full stack" in exact
+        or "full-stack" in exact
+        or "web engineer" in exact
+        or (("platform engineer" in exact or "engineer" in exact) and "software" in value)
+    ):
         return RoleCategory.SOFTWARE_ENGINEER.value
     if "marketing" in value:
         return "marketing"
@@ -253,7 +273,7 @@ def _labelled_fields(soup: BeautifulSoup) -> dict[str, str]:
         text = _normalize_ws(row.get_text(" "))
         if not text or len(text) > 500:
             continue
-        match = re.match(r"^(Job type|Type|Role|Experience|Visa|Skills?|Location|Compensation|Salary)\s*[:\-]\s*(.+)$", text, re.IGNORECASE)
+        match = re.match(r"^(Job type|Type|Role|Experience|Visa|Sponsorship|Work authorization|Skills?|Location|Compensation|Salary)\s*[:\-]\s*(.+)$", text, re.IGNORECASE)
         if match:
             labels[_label_key(match.group(1))] = match.group(2).strip()
             continue
@@ -277,6 +297,8 @@ def _label_key(value: str) -> str:
         "role": "role",
         "experience": "experience",
         "visa": "visa",
+        "sponsorship": "sponsorship",
+        "work authorization": "work_authorization",
         "skills": "skills",
         "skill": "skills",
         "location": "location",
@@ -287,17 +309,17 @@ def _label_key(value: str) -> str:
 
 
 def _title_field(json_ld: dict[str, Any], soup: BeautifulSoup, canonical_url: str) -> JobFieldValue | None:
-    title = _normalize_ws(json_ld.get("title")) if json_ld else ""
+    title = strip_job_title_action_suffix(_normalize_ws(json_ld.get("title"))) if json_ld else ""
     if title:
         return _field(title, 1.0, "json_ld", {"source": "JobPosting.title"})
     h1 = soup.find("h1")
     if h1:
-        h1_text = _clean_title(h1.get_text(" "))
+        h1_text = strip_job_title_action_suffix(_clean_title(h1.get_text(" ")))
         if h1_text:
             return _field(h1_text, 0.98, "primary_heading")
     og = soup.find("meta", property="og:title") or soup.find("meta", attrs={"name": "title"})
     if og and og.get("content"):
-        text = _clean_title(str(og["content"]))
+        text = strip_job_title_action_suffix(_clean_title(str(og["content"])))
         if text:
             return _field(text, 0.9, "open_graph")
     slug_title = _title_from_slug(canonical_url)
@@ -425,22 +447,18 @@ def _equity_field(labels: dict[str, str], text: str) -> JobFieldValue | None:
 
 
 def _visa_fields(labels: dict[str, str], text: str) -> tuple[JobFieldValue | None, JobFieldValue | None]:
-    raw = labels.get("visa") or ""
-    haystack = raw or text[:3000]
-    lower = haystack.lower()
-    if "will sponsor" in lower:
-        return _field("sponsors", 0.95, "visa_label", {"raw": raw}), None
-    if "unable to sponsor" in lower or "no visa sponsorship" in lower:
-        return _field("does_not_sponsor", 0.95, "visa_label", {"raw": raw}), None
-    if "citizen" in lower or "visa only" in lower:
-        return _field("restricted", 0.9, "visa_label", {"raw": raw}), _field(haystack[:255], 0.85, "visa_label")
-    if "right to work" in lower or "work authorization" in lower:
-        return _field("existing_authorization_required", 0.9, "visa_label", {"raw": raw}), _field(haystack[:255], 0.85, "visa_label")
-    return None, None
+    visa, focused = focused_authorization_fields(labels, text)
+    return (
+        _field(visa, 0.9, "authorization_evidence") if visa else None,
+        _field(focused, 0.85, "authorization_evidence", {"source": "focused_authorization"}) if focused else None,
+    )
 
 
 def _skills_fields(json_ld: dict[str, Any], labels: dict[str, str]) -> tuple[JobFieldValue | None, JobFieldValue | None]:
     skills_raw = labels.get("skills") or json_ld.get("skills")
+    cleaned = _dedupe_list(split_structured_skill_text(skills_raw))
+    field = _field(cleaned, 0.95, "skills_label") if cleaned else None
+    return field, field
     if isinstance(skills_raw, list):
         skills = [str(item) for item in skills_raw]
     else:
@@ -454,6 +472,8 @@ def _preferred_skills_field(text: str) -> JobFieldValue | None:
     match = re.search(r"(?is)(Nice to have|Preferred qualifications?)\s*[:\n]\s*(.+?)(?:\n[A-Z][^\n]{1,60}\n|$)", text)
     if not match:
         return None
+    skills = _dedupe_list(split_structured_skill_text(match.group(2)))
+    return _field(skills[:20], 0.75, "preferred_section") if skills else None
     skills = _dedupe_list(re.split(r"[,;\n•|-]", match.group(2)))
     return _field(skills[:20], 0.75, "preferred_section") if skills else None
 
@@ -596,7 +616,7 @@ def _clean_title(value: str) -> str:
     text = _normalize_ws(value)
     text = re.sub(r"\s+\|\s+Y Combinator.*$", "", text, flags=re.IGNORECASE)
     text = re.sub(r"\s+at\s+.+$", "", text, flags=re.IGNORECASE)
-    return text.strip(" -|")
+    return strip_job_title_action_suffix(text.strip(" -|")) or ""
 
 
 def _html_to_text(value: str) -> str:
@@ -629,10 +649,11 @@ def _clean_text(value: str) -> str:
 
 
 def _normalize_ws(value: Any) -> str:
-    return re.sub(r"\s+", " ", str(value or "")).strip()
+    return re.sub(r"\s+", " ", repair_mojibake(str(value or "")) or "").strip()
 
 
 def _dedupe_list(items: list[str]) -> list[str]:
+    return dedupe_meaningful_entries(items, maximum=30, max_length=120)
     result: list[str] = []
     seen: set[str] = set()
     for item in items:
