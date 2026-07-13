@@ -10,11 +10,19 @@ from app.schemas.discovery import (
     DiscoveryRunResult,
     ManualDiscoveryRequest,
 )
+from app.schemas.himalayas_discovery import (
+    HimalayasDiscoveryRequest,
+    HimalayasDiscoveryResult,
+    HimalayasQueryPlanRead,
+)
 from app.discovery.sources.hacker_news.schemas import (
     HackerNewsDiscoveryRequest,
     HackerNewsDiscoveryResponse,
 )
 from app.services.discovery_service import DiscoveryService
+from app.services.himalayas_remote_job_discovery_service import (
+    HimalayasRemoteJobDiscoveryService,
+)
 from app.utils.enums import DiscoveryRunStatus, DiscoverySource
 
 router = APIRouter(prefix="/discovery", tags=["discovery"])
@@ -22,6 +30,10 @@ router = APIRouter(prefix="/discovery", tags=["discovery"])
 
 def get_discovery_service(db: Session = Depends(get_db)) -> DiscoveryService:
     return DiscoveryService(db)
+
+
+def get_himalayas_service(db: Session = Depends(get_db)) -> HimalayasRemoteJobDiscoveryService:
+    return HimalayasRemoteJobDiscoveryService(db)
 
 
 @router.post(
@@ -60,6 +72,35 @@ async def run_hacker_news_discovery(
             details={"run_id": result.run.id},
         )
     return result
+
+
+@router.get(
+    "/himalayas/jobs/query-plan",
+    response_model=HimalayasQueryPlanRead,
+    summary="Preview targeted Himalayas remote-job queries",
+)
+def preview_himalayas_job_queries(
+    service: HimalayasRemoteJobDiscoveryService = Depends(get_himalayas_service),
+):
+    return service.query_plan_result()
+
+
+@router.post(
+    "/himalayas/jobs",
+    response_model=HimalayasDiscoveryResult,
+    summary="Run targeted Himalayas remote-job discovery",
+)
+async def run_himalayas_job_discovery(
+    data: HimalayasDiscoveryRequest | None = None,
+    service: HimalayasRemoteJobDiscoveryService = Depends(get_himalayas_service),
+):
+    request = data or HimalayasDiscoveryRequest()
+    return await service.run_discovery(
+        force=request.force,
+        max_queries=request.max_queries,
+        max_pages_per_query=request.max_pages_per_query,
+        score_after_ingestion=request.score_after_ingestion,
+    )
 
 
 @router.get(
