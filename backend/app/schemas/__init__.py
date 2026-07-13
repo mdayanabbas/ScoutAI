@@ -80,6 +80,14 @@ from app.schemas.job import (
     JobUpdate,
 )
 from app.schemas.job_source import JobSourceDetectionRead
+from app.schemas.himalayas_discovery import (
+    HimalayasAcceptedJobSummary,
+    HimalayasDiscoveryRequest,
+    HimalayasDiscoveryResult,
+    HimalayasQueryPlanRead,
+    HimalayasQueryResult,
+    HimalayasRejectedCandidateSummary,
+)
 from app.schemas.job_match import (
     JobMatchBatchItemRead,
     JobMatchBatchRead,
@@ -162,6 +170,12 @@ __all__ = [
     "JobListItem",
     "JobRead",
     "JobSourceDetectionRead",
+    "HimalayasAcceptedJobSummary",
+    "HimalayasDiscoveryRequest",
+    "HimalayasDiscoveryResult",
+    "HimalayasQueryPlanRead",
+    "HimalayasQueryResult",
+    "HimalayasRejectedCandidateSummary",
     "JobMatchingProfileCreate",
     "JobMatchBatchItemRead",
     "JobMatchBatchRead",
