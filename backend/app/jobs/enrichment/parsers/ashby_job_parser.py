@@ -13,6 +13,7 @@ from app.jobs.enrichment.parsers.ycombinator_job_parser import (
 from app.jobs.enrichment.providers.ashby_models import AshbyPublicJobPosting
 from app.jobs.job_source_detector import normalize_job_url, parse_ashby_job_url
 from app.utils.enums import RemoteType
+from app.utils.text import repair_mojibake, strip_job_title_action_suffix
 
 PROVIDER = "ashby_public_job_board"
 TECH_WORDS = {
@@ -61,7 +62,7 @@ class AshbyJobParser:
         )
         salary_min, salary_max, currency, salary_text = _salary_fields(posting.compensation)
         fields = {
-            "title": _field(posting.title, 1.0, "ashby_api_title"),
+            "title": _field(strip_job_title_action_suffix(posting.title), 1.0, "ashby_api_title"),
             "description": _field(description, 0.95, "ashby_description"),
             "role_category": _field(role_category, 0.95 if role_category != "other" else 0.65, "deterministic_role_classifier"),
             "seniority": _seniority_field(posting.title, description),
@@ -152,12 +153,12 @@ def _field(value: Any, confidence: float, source: str, evidence: dict[str, Any] 
 
 def _description(posting: AshbyPublicJobPosting) -> str | None:
     if posting.description_plain:
-        return _bounded(_clean_description(posting.description_plain), MAX_DESCRIPTION_CHARS)
+        return _bounded(_clean_description(repair_mojibake(posting.description_plain) or ""), MAX_DESCRIPTION_CHARS)
     if posting.description_html:
         soup = BeautifulSoup(posting.description_html, "html.parser")
         for tag in soup(["script", "style", "noscript", "svg"]):
             tag.decompose()
-        return _bounded(_clean_description(soup.get_text("\n")), MAX_DESCRIPTION_CHARS)
+        return _bounded(_clean_description(repair_mojibake(soup.get_text("\n")) or ""), MAX_DESCRIPTION_CHARS)
     return None
 
 
@@ -165,8 +166,9 @@ def _location(posting: AshbyPublicJobPosting) -> str | None:
     values = [posting.location, *posting.secondary_locations]
     result = []
     for item in values:
-        if item and item not in result:
-            result.append(item)
+        cleaned = repair_mojibake(item) if item else None
+        if cleaned and cleaned not in result:
+            result.append(cleaned)
     return " / ".join(result) if result else None
 
 
@@ -298,7 +300,7 @@ def _equity_field(compensation: Any, description: str | None) -> JobFieldValue |
 def _technology_field(description: str | None) -> JobFieldValue | None:
     if not description:
         return None
-    found = [word for word in sorted(TECH_WORDS) if re.search(rf"(?<![\w.+#]){re.escape(word)}(?![\w.+#])", description, re.IGNORECASE)]
+    found = [word for word in sorted(TECH_WORDS) if re.search(rf"(?<![\w+#]){re.escape(word)}(?![\w+#])", description, re.IGNORECASE)]
     return _field(found, 0.75, "technology_text") if found else None
 
 
@@ -337,7 +339,7 @@ def _clean_description(value: str) -> str:
     lines = []
     seen: set[str] = set()
     for raw in value.splitlines():
-        line = re.sub(r"\s+", " ", raw).strip()
+        line = re.sub(r"\s+", " ", repair_mojibake(raw) or "").strip()
         if not line:
             continue
         lower = line.lower()

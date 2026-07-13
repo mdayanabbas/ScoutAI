@@ -70,6 +70,46 @@ def test_semantic_cards_pair_title_with_correct_url_and_ignore_nav_footer():
     ]
 
 
+def test_blocked_paths_use_exact_segments_not_role_slug_substrings():
+    html = """
+    <main>
+      <article><h3>Account Executive</h3><a href="/careers/account-executive">Details</a></article>
+      <article><h3>Account Manager</h3><a href="/jobs/account-manager">Details</a></article>
+      <article><h3>Auth Engineer</h3><a href="/careers/auth-engineer">Details</a></article>
+      <article><h3>Backend Engineer</h3><a href="/account">Details</a></article>
+      <article><h3>Frontend Engineer</h3><a href="/account/settings">Details</a></article>
+    </main>
+    """
+
+    result = parse(html)
+    by_title = {item.title: item for item in result.candidates}
+
+    assert by_title["Account Executive"].rejection_reason is None
+    assert by_title["Account Manager"].rejection_reason is None
+    assert by_title["Auth Engineer"].rejection_reason is None
+    assert by_title["Backend Engineer"].rejection_reason == "blocked_path"
+    assert by_title["Frontend Engineer"].rejection_reason == "blocked_path"
+
+
+def test_listing_titles_strip_terminal_action_labels_only():
+    html = """
+    <main>
+      <article><h3>R&D Test Engineer, Senior Apply</h3><a href="/careers/test-engineer">Details</a></article>
+      <article><h3>Electrical Engineer, Staff Apply Now</h3><a href="/careers/electrical-engineer">Details</a></article>
+      <article><h3>Applied Scientist</h3><a href="/careers/applied-scientist">Details</a></article>
+      <article><h3>Application Engineer</h3><a href="/careers/application-engineer">Details</a></article>
+    </main>
+    """
+
+    result = parse(html)
+    titles = [item.title for item in result.candidates if not item.rejection_reason]
+
+    assert "R&D Test Engineer, Senior" in titles
+    assert "Electrical Engineer, Staff" in titles
+    assert "Applied Scientist" in titles
+    assert "Application Engineer" in titles
+
+
 def test_generic_parent_suffix_attack_and_external_ats_rejections():
     html = """
     <main>

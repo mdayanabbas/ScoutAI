@@ -20,7 +20,7 @@ from app.jobs.enrichment.providers.ycombinator_job_provider import (
     PROVIDER_NAME,
     YCombinatorJobEnrichmentProvider,
 )
-from app.jobs.job_source_detector import JobSourceDetector, parse_ashby_job_url
+from app.jobs.job_source_detector import JobSourceDetector, normalize_job_url, parse_ashby_job_url, parse_yc_job_url
 from app.models.job import Job
 from app.models.job_enrichment_attempt import JobEnrichmentAttempt
 from app.repositories.job_enrichment_attempt_repository import (
@@ -28,7 +28,14 @@ from app.repositories.job_enrichment_attempt_repository import (
 )
 from app.repositories.job_repository import JobRepository
 from app.utils.enums import JobEnrichmentStatus, JobSourceType
-from app.utils.text import normalize_title
+from app.utils.text import (
+    clean_text_list,
+    clean_text_value,
+    normalize_title,
+    repair_mojibake,
+    should_replace_job_title,
+    strip_job_title_action_suffix,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +122,7 @@ class JobDetailEnrichmentService:
             else:
                 parsed = await provider.enrich(detection)
             if not parsed.success:
-                evidence = _bounded_evidence(parsed, {}, {})
+                evidence = _bounded_evidence(parsed, {}, {}, job)
                 if parsed.reason in UNRESOLVED_REASONS:
                     self.job_repository.update_enrichment_fields(
                         job.id,
@@ -167,7 +174,7 @@ class JobDetailEnrichmentService:
             if _meaningful_update_fields(updates):
                 updates["enriched_at"] = datetime.now(timezone.utc)
             updated_job = self.job_repository.update_enrichment_fields(job.id, updates)
-            evidence = _bounded_evidence(parsed, updates, preserved)
+            evidence = _bounded_evidence(parsed, updates, preserved, job)
             if status == JobEnrichmentStatus.ENRICHED.value:
                 completed = self.attempt_repository.mark_succeeded(
                     attempt,
@@ -266,26 +273,31 @@ def _build_safe_updates(
             if value is not None:
                 preserved[field] = "extracted_confidence_too_low"
             return
+        new_value = _clean_update_value(field, value.value)
         current = getattr(job, field)
         if current in (None, "", [], "unknown"):
-            updates[field] = value.value
+            updates[field] = new_value
+        elif _should_repair_existing_value(field, current, new_value):
+            updates[field] = new_value
         else:
             preserved[field] = "existing_value_present"
 
     title = parsed.title
-    if title and title.confidence >= 0.9:
-        if is_generic_job_title(job.title) or _hn_sentence_title(job.title):
-            updates["title"] = title.value
-            updates["normalized_title"] = normalize_title(title.value)
-            logger.info("Generic title replaced", extra={"job_id": job.id})
-        elif job.title != title.value:
+    if title and should_replace_job_title(job.title, title.value, title.confidence, title.source):
+        clean_title = strip_job_title_action_suffix(str(title.value)) or str(title.value)
+        updates["title"] = clean_title
+        updates["normalized_title"] = normalize_title(clean_title)
+        logger.info("Job title replaced with verified provider title", extra={"job_id": job.id})
+    elif title and title.confidence >= 0.9:
+        clean_title = strip_job_title_action_suffix(str(title.value)) or str(title.value)
+        if job.title != clean_title:
             preserved["title"] = "existing_precise_title_preserved"
     elif title and title.confidence < 0.9:
         preserved["title"] = "weak_title_preserved"
 
     if parsed.description:
         current_description = job.description or ""
-        new_description = str(parsed.description.value)
+        new_description = repair_mojibake(str(parsed.description.value)) or str(parsed.description.value)
         if _should_replace_description(current_description, new_description):
             updates["description"] = new_description
         else:
@@ -294,6 +306,8 @@ def _build_safe_updates(
     if parsed.job_url and parsed.job_url.confidence >= 0.9:
         current_ashby = parse_ashby_job_url(job.job_url)
         parsed_ashby = parse_ashby_job_url(parsed.job_url.value)
+        parsed_yc = parse_yc_job_url(parsed.job_url.value)
+        parsed_normalized = normalize_job_url(parsed.job_url.value)
         if (
             current_ashby
             and current_ashby.board_level
@@ -303,11 +317,19 @@ def _build_safe_updates(
             updates["job_url"] = parsed_ashby.canonical_url
         elif current_ashby and current_ashby.exact_posting:
             preserved["job_url"] = "existing_exact_posting_url_preserved"
+        elif parsed_ashby and parsed_ashby.exact_posting:
+            updates["job_url"] = parsed_ashby.canonical_url
+        elif parsed_yc:
+            if job.job_url != parsed_yc.canonical_url:
+                updates["job_url"] = parsed_yc.canonical_url
+        elif parsed_normalized.valid and parsed_normalized.canonical_url and job.job_url != parsed_normalized.canonical_url:
+            updates["job_url"] = parsed_normalized.canonical_url
         elif parsed_ashby:
             preserved["job_url"] = "existing_non_board_url_preserved"
 
     if parsed.role_category and parsed.role_category.confidence >= 0.9:
-        updates["role_category"] = parsed.role_category.value
+        if job.role_category in (None, "", "unknown") or job.role_category != parsed.role_category.value:
+            updates["role_category"] = parsed.role_category.value
     elif parsed.role_category:
         preserved["role_category"] = "classifier_confidence_too_low"
 
@@ -330,16 +352,16 @@ def _build_safe_updates(
     ):
         maybe_set(field_name, parsed_field, min_confidence=minimum)
 
-    if parsed.required_skills and not job.required_skills_json:
-        updates["required_skills_json"] = parsed.required_skills.value
+    if parsed.required_skills and (not job.required_skills_json or _should_replace_list(job.required_skills_json, parsed.required_skills.value)):
+        updates["required_skills_json"] = clean_text_list(parsed.required_skills.value) or parsed.required_skills.value
     elif parsed.required_skills:
         preserved["required_skills_json"] = "existing_value_present"
-    if parsed.preferred_skills and not job.preferred_skills_json:
-        updates["preferred_skills_json"] = parsed.preferred_skills.value
+    if parsed.preferred_skills and (not job.preferred_skills_json or _should_replace_list(job.preferred_skills_json, parsed.preferred_skills.value)):
+        updates["preferred_skills_json"] = clean_text_list(parsed.preferred_skills.value) or parsed.preferred_skills.value
     elif parsed.preferred_skills:
         preserved["preferred_skills_json"] = "existing_value_present"
-    if parsed.technologies and not job.technologies_json:
-        updates["technologies_json"] = parsed.technologies.value
+    if parsed.technologies and (not job.technologies_json or _should_replace_list(job.technologies_json, parsed.technologies.value)):
+        updates["technologies_json"] = clean_text_list(parsed.technologies.value) or parsed.technologies.value
     elif parsed.technologies:
         preserved["technologies_json"] = "existing_value_present"
     return updates, preserved
@@ -363,9 +385,52 @@ def _meaningful_update_fields(updates: dict[str, Any]) -> bool:
 def _should_replace_description(current: str, new: str) -> bool:
     if not new or len(new) < 80:
         return False
+    if _has_mojibake(current) and not _has_mojibake(new):
+        return True
     if not current or len(current) < 200:
         return True
     return len(new) > len(current) * 1.4
+
+
+def _clean_update_value(field: str, value: Any) -> Any:
+    if field in {"location", "salary_text", "work_authorization"}:
+        return clean_text_value(value)
+    return value
+
+
+def _should_repair_existing_value(field: str, current: Any, new: Any) -> bool:
+    if new in (None, "", []):
+        return False
+    if field in {"location", "salary_text", "work_authorization"}:
+        current_text = str(current or "")
+        new_text = str(new or "")
+        if _has_mojibake(current_text) and not _has_mojibake(new_text):
+            return True
+        if field == "work_authorization" and _polluted_authorization(current_text) and not _polluted_authorization(new_text):
+            return True
+    return False
+
+
+def _should_replace_list(current: Any, new: Any) -> bool:
+    current_list = current if isinstance(current, list) else []
+    new_list = clean_text_list(new if isinstance(new, list) else []) or []
+    if not new_list:
+        return False
+    if any(_has_mojibake(str(item)) for item in current_list) and not any(_has_mojibake(item) for item in new_list):
+        return True
+    current_fragments = sum(1 for item in current_list if len(str(item).split()) <= 1 and len(str(item)) <= 5)
+    new_fragments = sum(1 for item in new_list if len(str(item).split()) <= 1 and len(str(item)) <= 5)
+    return current_fragments > new_fragments and len(new_list) >= max(1, len(current_list) // 2)
+
+
+def _has_mojibake(value: str) -> bool:
+    repaired = repair_mojibake(value)
+    return repaired != value
+
+
+def _polluted_authorization(value: str) -> bool:
+    lower = value.lower()
+    return any(token in lower for token in ("open menu", "yc interview guide", "recommended jobs", "about y combinator"))
 
 
 def _hn_sentence_title(value: str | None) -> bool:
@@ -377,6 +442,7 @@ def _bounded_evidence(
     parsed: JobDetailExtractionResult,
     updates: dict[str, Any],
     preserved: dict[str, str],
+    job: Job | None = None,
 ) -> dict[str, Any]:
     evidence = dict(parsed.evidence)
     evidence.pop("raw_html", None)
@@ -386,6 +452,11 @@ def _bounded_evidence(
     evidence["preserved_fields"] = preserved
     evidence["field_confidence"] = parsed.field_confidence
     evidence["extracted_field_names"] = sorted(parsed.field_confidence)
+    if job is not None and "job_url" in updates:
+        evidence["job_url_change"] = {
+            "previous": job.job_url,
+            "new": updates["job_url"],
+        }
     return evidence
 
 
