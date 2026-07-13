@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.core.errors import NotFoundError
+from app.matching.job_actionability import JobActionabilityValidator
 from app.matching.remote_eligibility import REMOTE_PRIORITY, RemoteEligibilityClassifier
 from app.matching.role_matcher import TargetRoleMatcher
 from app.models.job import Job
@@ -21,7 +22,7 @@ from app.utils.text import normalize_title
 
 logger = logging.getLogger(__name__)
 
-SCORING_VERSION = "job-match-v1"
+SCORING_VERSION = "job-match-v1.1"
 
 
 @dataclass(frozen=True)
@@ -58,6 +59,7 @@ class JobMatchingService:
         self.user_profile_repository = UserProfileRepository(session)
         self.profile_repository = JobMatchingProfileRepository(session)
         self.match_repository = JobMatchRepository(session)
+        self.actionability_validator = JobActionabilityValidator()
         self.remote_classifier = RemoteEligibilityClassifier()
         self.role_matcher = TargetRoleMatcher()
 
@@ -110,7 +112,15 @@ class JobMatchingService:
                 created += 1 if action == "created" else 0
                 updated += 1 if action == "updated" else 0
                 counters[match.eligibility_status] = counters.get(match.eligibility_status, 0) + 1
-                results.append({"job_id": job.id, "status": "scored", "match_id": match.id, "eligibility_status": match.eligibility_status})
+                results.append(
+                    {
+                        "job_id": job.id,
+                        "status": "scored",
+                        "match_id": match.id,
+                        "eligibility_status": match.eligibility_status,
+                        "reason": match.eligibility_reason,
+                    }
+                )
             except Exception as exc:
                 self.session.rollback()
                 failed += 1
@@ -150,6 +160,7 @@ class JobMatchingService:
         remote_eligibility: str | None = None,
         minimum_score: float | None = None,
         include_unsuitable: bool = False,
+        include_remote_unknown: bool = False,
         limit: int = 20,
         offset: int = 0,
         order_by: str = "recommended",
@@ -164,6 +175,16 @@ class JobMatchingService:
             limit=500,
             offset=0,
         )
+        if not include_unsuitable and remote_eligibility is None:
+            allowed_remote = {
+                "work_from_anywhere",
+                "remote_india_eligible",
+                "remote_global_unspecified",
+                "remote_eligibility_unclear",
+            }
+            if include_remote_unknown:
+                allowed_remote.add("unknown")
+            matches = [match for match in matches if match.remote_eligibility in allowed_remote]
         return _sort_matches(matches, order_by)[offset : offset + limit]
 
     def is_stale(self, match: JobMatch, profile: JobMatchingProfile | None = None) -> bool:
@@ -188,12 +209,15 @@ class JobMatchingService:
     def _score(self, job: Job, profile: JobMatchingProfile) -> ScoredJob:
         role = self.role_matcher.match(job, profile)
         remote = self.remote_classifier.classify(job, profile)
+        actionability = self.actionability_validator.validate(job)
         hard_filters: list[str] = []
         positives = [*role.positive_signals, *remote.positive_signals]
         negatives = [*role.negative_signals, *remote.negative_signals]
         missing: list[str] = []
         if _excluded_company(job, profile):
             hard_filters.append("excluded_company")
+        if not actionability.actionable:
+            hard_filters.append("invalid_or_unactionable_job")
         if role.match_type == "excluded":
             hard_filters.append(role.reason)
         if remote.classification in {"onsite", "hybrid"}:
@@ -245,7 +269,7 @@ class JobMatchingService:
         )
         eligibility = _eligibility(hard_filters, role, remote.classification, job, seniority_score, experience_score, missing)
         tier = _tier(eligibility, total, role.score, remote_score)
-        explanation = _explanation(eligibility, role.canonical_role, remote.classification, hard_filters, experience_reason)
+        explanation = _explanation(eligibility, role.canonical_role, remote.classification, hard_filters, experience_reason, job)
         if eligibility == "unsuitable":
             total = min(total, 30)
             tier = "unsuitable"
@@ -255,6 +279,12 @@ class JobMatchingService:
             "remote": remote.reason,
             "seniority": seniority_reason,
             "experience": experience_reason,
+            "actionability_status": actionability.status,
+            "actionability_confidence": actionability.confidence,
+            "valid_job_url": actionability.valid_job_url,
+            "valid_apply_url": actionability.valid_apply_url,
+            "actionability_reasons": actionability.reasons,
+            "actionability_warnings": actionability.warnings,
             "explanation": explanation,
         }
         return ScoredJob(
@@ -459,12 +489,19 @@ def _tier(eligibility: str, total: float, role_score: int, remote_score: int) ->
     return "stretch" if eligibility == "uncertain" else "unsuitable"
 
 
-def _explanation(eligibility: str, role: str | None, remote: str, hard_filters: list[str], experience_reason: str) -> str:
+def _explanation(eligibility: str, role: str | None, remote: str, hard_filters: list[str], experience_reason: str, job: Job | None = None) -> str:
     if eligibility == "unsuitable":
+        if "invalid_or_unactionable_job" in hard_filters:
+            return "Unsuitable: invalid or unactionable job URL."
+        if "onsite" in hard_filters:
+            location = f" in {job.location}" if job is not None and getattr(job, "location", None) else ""
+            return f"Unsuitable: role requires in-person work{location}."
         return "Unsuitable: " + ", ".join(hard_filters or ["hard filter triggered"]) + "."
     if eligibility == "stretch":
         return f"Stretch: target {role or 'role'} role, remote eligibility is {remote}, and {experience_reason}."
     if eligibility == "uncertain":
+        if remote == "unknown":
+            return f"Worth checking: target {role or 'role'} role, but remote status is unverified."
         return f"Worth checking: target {role or 'role'} role, but important eligibility details are missing."
     return f"Strong match: {role or 'target'} role with {remote.replace('_', ' ')} eligibility."
 
@@ -478,6 +515,7 @@ def _sort_matches(matches: list[JobMatch], order_by: str) -> list[JobMatch]:
     return sorted(
         matches,
         key=lambda item: (
+            item.remote_eligibility == "unknown",
             tier_rank.get(item.match_tier, 9),
             REMOTE_PRIORITY.get(item.remote_eligibility, 9),
             -item.total_score,

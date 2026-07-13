@@ -33,3 +33,16 @@ def test_authorization_restriction_overrides_generic_remote():
 
     assert result.classification == "remote_country_restricted"
     assert result.reason == "authorization_restriction"
+
+
+def test_explicit_onsite_phrases_are_onsite():
+    assert classify(location="Detroit", description="This role is full time, in person in Detroit.") == "onsite"
+    assert classify(description="This role is not remote.") == "onsite"
+    assert classify(description="Remote work is not available for this role.") == "onsite"
+
+
+def test_optional_office_or_offsite_mentions_do_not_force_onsite():
+    assert classify(description="Remote worldwide. Optional office visits are welcome.") == "work_from_anywhere"
+    assert classify(description="Remote role with annual team meetups and company offsites.") == "remote_global_unspecified"
+    assert classify(location="San Francisco", description="Build excellent systems.") == "unknown"
+    assert classify(description="Build excellent systems.") == "unknown"

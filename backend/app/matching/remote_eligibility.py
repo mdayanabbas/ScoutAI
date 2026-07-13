@@ -31,13 +31,14 @@ class RemoteEligibilityClassifier:
         raw_remote_type = getattr(job, "remote_type", "") or ""
         remote_type = str(getattr(raw_remote_type, "value", raw_remote_type)).lower()
         text = _text(job)
+        focused_sentences = _focused_sentences(job)
         location = str(getattr(job, "location", "") or "").lower()
         willing = getattr(profile, "willing_to_relocate", None)
-        if remote_type == "onsite" or _has(text, r"\bonsite\b|\bon-site\b|in-person"):
+        if remote_type == "onsite" or _has_onsite_requirement(focused_sentences):
             return _result("onsite", 0.95, negative=["onsite"], reason="onsite")
         if remote_type == "hybrid" or _has(text, r"\bhybrid\b"):
             return _result("hybrid", 0.95, negative=["hybrid"], reason="hybrid")
-        if willing is False and _has(text, r"\brelocat(e|ion)\b.*\brequired\b|\bmust relocate\b"):
+        if willing is False and _has_onsite_requirement(focused_sentences, relocation_only=True):
             return _result("onsite", 0.9, negative=["relocation_required"], reason="relocation_required")
         if _has_auth_restriction(text):
             return _result("remote_country_restricted", 0.95, negative=["authorization_restriction"], restrictions=["authorization"], reason="authorization_restriction")
@@ -55,7 +56,7 @@ class RemoteEligibilityClassifier:
             return _result("work_from_anywhere", 0.9, positive=["remote_worldwide"], reason="remote_worldwide")
         if remote_type in {"remote_country", "remote_region"}:
             return _result("remote_eligibility_unclear", 0.65, positive=[remote_type], restrictions=[location] if location else [], reason="remote_scope_missing")
-        if "remote" in remote_type or _has(text, r"\bremote\b"):
+        if "remote" in remote_type or _has_positive_remote_evidence(job, focused_sentences):
             return _result("remote_global_unspecified", 0.75, positive=["remote_signal"], reason="remote_no_restriction_found")
         return _result("unknown", 0.4, reason="missing_remote_data")
 
@@ -80,6 +81,51 @@ def _text(job: Any) -> str:
         getattr(job, "visa_sponsorship", None),
     ]
     return " ".join(str(part or "") for part in parts).lower()
+
+
+def _focused_sentences(job: Any) -> list[str]:
+    text = "\n".join(
+        str(part or "")
+        for part in (
+            getattr(job, "description", None),
+            getattr(job, "location", None),
+        )
+        if part
+    )
+    return [sentence.strip().lower() for sentence in re.split(r"(?<=[.!?])\s+|\n+", text) if sentence.strip()]
+
+
+def _has_onsite_requirement(sentences: list[str], *, relocation_only: bool = False) -> bool:
+    for sentence in sentences:
+        if _optional_onsite_context(sentence):
+            continue
+        if relocation_only:
+            if _has(sentence, r"\brelocation required\b|\bmust relocate\b|\brelocate to\b"):
+                return True
+            continue
+        if _has(
+            sentence,
+            r"\bin person\b|\bin-person\b|\bon site\b|\bon-site\b|\bonsite\b|office based|office-based|work from our office|based in our office|must work from|must be based in|located in and working onsite|\brelocation required\b|\brelocate to\b|\bno remote\b|remote work is not available|this role is not remote|full time in person|full-time in person",
+        ):
+            return True
+    return False
+
+
+def _optional_onsite_context(sentence: str) -> bool:
+    return _has(
+        sentence,
+        r"occasional company offsites?|optional office visits?|customer onsite visits?|annual team meetups?|team offsites?|company offsites?",
+    )
+
+
+def _has_positive_remote_evidence(job: Any, sentences: list[str]) -> bool:
+    location = str(getattr(job, "location", "") or "").lower()
+    if re.search(r"\bremote\b", location):
+        return True
+    for sentence in sentences:
+        if _has(sentence, r"\bremote\b|work from anywhere|distributed team|location independent"):
+            return True
+    return False
 
 
 def _has(text: str, pattern: str) -> bool:

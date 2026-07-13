@@ -63,6 +63,9 @@ class JobMatchRead(BaseModel):
     negative_signals: list[str] = Field(default_factory=list)
     missing_information: list[str] = Field(default_factory=list)
     score_breakdown: dict[str, Any] = Field(default_factory=dict)
+    actionability_status: str | None = None
+    valid_job_url: bool | None = None
+    valid_apply_url: bool | None = None
     scoring_version: str
     scored_at: datetime
     created_at: datetime
@@ -98,6 +101,9 @@ class JobMatchRead(BaseModel):
             "negative_signals": value.negative_signals_json or [],
             "missing_information": value.missing_information_json or [],
             "score_breakdown": value.score_breakdown_json or {},
+            "actionability_status": (value.score_breakdown_json or {}).get("actionability_status"),
+            "valid_job_url": (value.score_breakdown_json or {}).get("valid_job_url"),
+            "valid_apply_url": (value.score_breakdown_json or {}).get("valid_apply_url"),
             "scoring_version": value.scoring_version,
             "scored_at": value.scored_at,
             "created_at": value.created_at,
@@ -134,6 +140,9 @@ class JobMatchListItemRead(BaseModel):
     remote_score: float
     seniority_score: float
     experience_score: float
+    actionability_status: str | None = None
+    valid_job_url: bool | None = None
+    valid_apply_url: bool | None = None
     positive_signals: list[str] = Field(default_factory=list)
     negative_signals: list[str] = Field(default_factory=list)
     missing_information: list[str] = Field(default_factory=list)
@@ -144,6 +153,7 @@ class JobMatchListItemRead(BaseModel):
     def from_match(cls, match: Any, *, is_stale: bool = False) -> "JobMatchListItemRead":
         job = match.job
         company = getattr(job, "company", None)
+        breakdown = match.score_breakdown_json or {}
         return cls(
             job_id=job.id,
             company_id=job.company_id,
@@ -172,6 +182,9 @@ class JobMatchListItemRead(BaseModel):
             remote_score=match.remote_score,
             seniority_score=match.seniority_score,
             experience_score=match.experience_score,
+            actionability_status=breakdown.get("actionability_status"),
+            valid_job_url=breakdown.get("valid_job_url"),
+            valid_apply_url=breakdown.get("valid_apply_url"),
             positive_signals=match.positive_signals_json or [],
             negative_signals=match.negative_signals_json or [],
             missing_information=match.missing_information_json or [],
