@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+import json
 from uuid import uuid4
 
 import pytest
@@ -114,6 +115,14 @@ def detail_html(title: str):
     """
 
 
+def jobposting_html(domain: str, postings: list[dict]):
+    return f"""
+    <html><head>
+      <script type="application/ld+json">{json.dumps(postings if len(postings) > 1 else postings[0])}</script>
+    </head><body><main><p>Current roles</p></main></body></html>
+    """
+
+
 @pytest.mark.asyncio
 async def test_broad_listing_creates_children_links_and_deactivates_parent(db_session):
     job, candidate, domain = parent(db_session)
@@ -193,3 +202,38 @@ async def test_specific_unknown_exact_and_fetch_failure_states(db_session):
     ).expand_listing(failed.id)
     assert failed_result.status == "failed"
     assert JobRepository(db_session).get_by_id(failed.id).status == "active"
+
+
+@pytest.mark.asyncio
+async def test_exact_jobposting_is_skipped_but_multiple_jobpostings_expand(db_session):
+    exact, _, exact_domain = parent(db_session)
+    exact_posting = {
+        "@type": "JobPosting",
+        "title": "Backend Engineer",
+        "url": f"https://{exact_domain}/careers/backend-engineer",
+        "hiringOrganization": {"name": "Example", "sameAs": f"https://{exact_domain}"},
+        "description": "<p>Build APIs.</p>",
+    }
+    exact_result = await FirstPartyListingExpansionService(
+        db_session,
+        client=FakeClient({f"https://{exact_domain}/careers": response(f"https://{exact_domain}/careers", jobposting_html(exact_domain, [exact_posting]))}),
+    ).expand_listing(exact.id)
+    assert exact_result.status == "skipped"
+    assert exact_result.reason == "exact_page_should_use_job_enrichment"
+    assert exact_result.jobs_created == 0
+    assert JobRepository(db_session).get_by_id(exact.id).status == "active"
+
+    listing, _, listing_domain = parent(db_session)
+    backend = {**exact_posting, "url": f"https://{listing_domain}/careers/backend-engineer", "hiringOrganization": {"name": "Example", "sameAs": f"https://{listing_domain}"}}
+    account = {**backend, "title": "Account Executive", "url": f"https://{listing_domain}/careers/account-executive"}
+    client = FakeClient(
+        {
+            f"https://{listing_domain}/careers": response(f"https://{listing_domain}/careers", jobposting_html(listing_domain, [backend, account])),
+            f"https://{listing_domain}/careers/backend-engineer": response(f"https://{listing_domain}/careers/backend-engineer", detail_html("Backend Engineer")),
+            f"https://{listing_domain}/careers/account-executive": response(f"https://{listing_domain}/careers/account-executive", detail_html("Account Executive")),
+        }
+    )
+    expanded = await FirstPartyListingExpansionService(db_session, client=client).expand_listing(listing.id)
+    assert expanded.status == "succeeded"
+    assert expanded.jobs_created == 2
+    assert expanded.detail_pages_fetched == 2

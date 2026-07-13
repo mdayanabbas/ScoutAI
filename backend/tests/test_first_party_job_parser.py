@@ -49,6 +49,87 @@ def test_parser_extracts_json_ld_jobposting_fields():
     assert "raw_html" not in result.evidence
 
 
+def test_parser_extracts_experience_from_structured_description_and_qualifications():
+    parser = FirstPartyJobParser()
+    plus = parser.parse(
+        _html({
+            "@type": "JobPosting",
+            "title": "Backend Engineer",
+            "description": "<p>Build APIs with Python and PostgreSQL.</p><p>5+ years required.</p>",
+            "hiringOrganization": {"name": "Example"},
+        }),
+        source_url="https://example.com/careers/backend-engineer",
+        canonical_url="https://example.com/careers/backend-engineer",
+        company_name="Example",
+        company_domain="example.com",
+    )
+    assert plus.experience_min.value == 5
+    assert plus.experience_max is None
+
+    ranged = parser.parse(
+        _html({
+            "@type": "JobPosting",
+            "title": "Backend Engineer",
+            "description": "<p>3-5 years of experience building APIs.</p>",
+            "hiringOrganization": {"name": "Example"},
+        }),
+        source_url="https://example.com/careers/backend-engineer",
+        canonical_url="https://example.com/careers/backend-engineer",
+        company_name="Example",
+        company_domain="example.com",
+    )
+    assert ranged.experience_min.value == 3
+    assert ranged.experience_max.value == 5
+
+    zero = parser.parse(
+        _html({
+            "@type": "JobPosting",
+            "title": "Junior Backend Engineer",
+            "description": "<p>0-2 years of experience.</p>",
+            "hiringOrganization": {"name": "Example"},
+        }),
+        source_url="https://example.com/careers/junior-backend-engineer",
+        canonical_url="https://example.com/careers/junior-backend-engineer",
+        company_name="Example",
+        company_domain="example.com",
+    )
+    assert zero.experience_min.value == 0
+    assert zero.experience_max.value == 2
+
+    explicit = parser.parse(
+        _html({
+            "@type": "JobPosting",
+            "title": "Backend Engineer",
+            "experienceRequirements": "7+ years required.",
+            "description": "<p>3-5 years of experience.</p>",
+            "hiringOrganization": {"name": "Example"},
+        }),
+        source_url="https://example.com/careers/backend-engineer",
+        canonical_url="https://example.com/careers/backend-engineer",
+        company_name="Example",
+        company_domain="example.com",
+    )
+    assert explicit.experience_min.value == 7
+    assert explicit.experience_max is None
+
+
+def test_parser_does_not_treat_unrelated_dates_as_experience():
+    result = FirstPartyJobParser().parse(
+        _html({
+            "@type": "JobPosting",
+            "title": "Backend Engineer",
+            "description": "<p>Copyright 2020-2024 Example. Posted 2026-01-02.</p>",
+            "hiringOrganization": {"name": "Example"},
+        }),
+        source_url="https://example.com/careers/backend-engineer",
+        canonical_url="https://example.com/careers/backend-engineer",
+        company_name="Example",
+        company_domain="example.com",
+    )
+    assert result.experience_min is None
+    assert result.experience_max is None
+
+
 def test_parser_handles_graph_malformed_listing_and_identity_mismatch():
     graph = {
         "@graph": [
@@ -82,6 +163,59 @@ def test_parser_listing_page_and_slug_fallback():
     assert result.reason == "first_party_listing_page_requires_expansion"
 
     slug = FirstPartyJobParser().parse("<html><body><main>We need someone excellent.</main></body></html>", source_url="https://example.com/careers/backend-engineer", canonical_url="https://example.com/careers/backend-engineer", company_name="Example", company_domain="example.com")
+    assert slug.success is True
     assert slug.title.value == "Backend Engineer"
     assert slug.title.confidence == 0.65
+    assert slug.title.source == "url_slug"
+
+
+def test_parser_slug_fallback_edges():
+    parser = FirstPartyJobParser()
+    structured = parser.parse(
+        _html({"@type": "JobPosting", "title": "Senior Backend Engineer", "hiringOrganization": {"name": "Example"}}),
+        source_url="https://example.com/careers/backend-engineer",
+        canonical_url="https://example.com/careers/backend-engineer",
+        company_name="Example",
+        company_domain="example.com",
+    )
+    slug = parser.parse("<html><body><main>We need someone excellent.</main></body></html>", source_url="https://example.com/careers/founding-ai-engineer", canonical_url="https://example.com/careers/founding-ai-engineer", company_name="Example", company_domain="example.com")
+    careers = parser.parse("<html><body><main>We need someone excellent.</main></body></html>", source_url="https://example.com/careers", canonical_url="https://example.com/careers", company_name="Example", company_domain="example.com")
+    openings = parser.parse("<html><body><main>We need someone excellent.</main></body></html>", source_url="https://example.com/openings", canonical_url="https://example.com/openings", company_name="Example", company_domain="example.com")
+    numeric = parser.parse("<html><body><main>We need someone excellent.</main></body></html>", source_url="https://example.com/careers/12345", canonical_url="https://example.com/careers/12345", company_name="Example", company_domain="example.com")
+
+    assert slug.title.value == "Founding AI Engineer"
+    assert careers.title is None
+    assert openings.title is None
+    assert numeric.title is None
+    assert slug.title.confidence < structured.title.confidence
+
+
+def test_parser_preserves_meaningful_skill_units_without_fragments():
+    html = """
+    <html><body><main>
+      <h1>Developer Advocate</h1>
+      <p>Preferred qualifications:</p>
+      <ul>
+        <li>Hands-on experience with MCP</li>
+        <li>co-marketing with developer-facing teams</li>
+        <li>React/Next.js</li>
+        <li>AuthN/AuthZ</li>
+        <li>CI/CD</li>
+      </ul>
+    </main></body></html>
+    """
+
+    result = FirstPartyJobParser().parse(
+        html,
+        source_url="https://example.com/careers/developer-advocate",
+        canonical_url="https://example.com/careers/developer-advocate",
+        company_name="Example",
+        company_domain="example.com",
+    )
+
+    assert "Hands-on experience with MCP" in result.preferred_skills.value
+    assert "co-marketing with developer-facing teams" in result.preferred_skills.value
+    assert "React/Next.js" in result.preferred_skills.value
+    assert "Hands" not in result.preferred_skills.value
+    assert "co" not in result.preferred_skills.value
 

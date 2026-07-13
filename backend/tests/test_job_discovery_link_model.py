@@ -25,7 +25,7 @@ def test_job_discovery_link_table_shape():
         table.columns.keys()
     )
     assert _has_unique_constraint(table, {"job_id", "discovery_candidate_id"})
-    assert _has_unique_constraint(table, {"discovery_candidate_id"})
+    assert not _has_unique_constraint(table, {"discovery_candidate_id"})
     assert {fk.column.table.name for fk in table.foreign_keys} == {
         "jobs",
         "discovery_candidates",

@@ -124,3 +124,18 @@ async def test_expand_first_party_listing_api_missing_running_and_body_forbidden
         json={"url": "https://evil.example/jobs", "company_id": str(uuid4())},
     )
     assert arbitrary.status_code == 400
+    assert arbitrary.json()["error"]["message"] == "This endpoint does not accept a request body"
+    assert "evil.example" not in arbitrary.text
+
+    empty_object = await expansion_api_client.post(
+        f"/api/v1/jobs/{body_job.id}/expand-first-party-listing",
+        json={},
+    )
+    assert empty_object.status_code == 400
+
+    company_body = await expansion_api_client.post(
+        f"/api/v1/jobs/{body_job.id}/expand-first-party-listing",
+        json={"company_id": str(uuid4())},
+    )
+    assert company_body.status_code == 400
+    assert "company_id" not in company_body.text

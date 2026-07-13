@@ -20,6 +20,7 @@ from app.repositories.job_enrichment_attempt_repository import (
 from app.repositories.job_matching_profile_repository import (
     JobMatchingProfileRepository,
 )
+from app.repositories.job_match_repository import JobMatchRepository
 from app.repositories.profile_repository import UserProfileRepository
 from app.repositories.tech_stack_repository import TechStackRepository
 
@@ -38,6 +39,7 @@ __all__ = [
     "JobBoardExpansionLinkRepository",
     "JobEnrichmentAttemptRepository",
     "JobMatchingProfileRepository",
+    "JobMatchRepository",
     "TechStackRepository",
     "UserProfileRepository",
 ]
