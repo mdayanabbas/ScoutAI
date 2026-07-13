@@ -25,6 +25,7 @@ class CompanySource(StrEnum):
 class DiscoverySource(StrEnum):
     MANUAL = "manual"
     HACKER_NEWS = "hacker_news"
+    HIMALAYAS = "himalayas"
     PRODUCT_HUNT = "product_hunt"
     YC = "yc"
     WELLFOUND = "wellfound"
