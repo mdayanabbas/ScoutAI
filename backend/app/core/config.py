@@ -102,6 +102,18 @@ class Settings(BaseSettings):
     BRAVE_SEARCH_BASE_URL: str = "https://api.search.brave.com/res/v1/web/search"
     BRAVE_SEARCH_USER_AGENT: str = "ScoutAI/0.1 company-identity-search"
     DISCOVERY_JOB_INGESTION_MAX_CANDIDATES_PER_RUN: int = Field(default=100, gt=0)
+    HIMALAYAS_DISCOVERY_ENABLED: bool = True
+    HIMALAYAS_API_BASE_URL: str = "https://himalayas.app"
+    HIMALAYAS_SEARCH_PATH: str = "/jobs/api/search"
+    HIMALAYAS_REQUEST_TIMEOUT_SECONDS: int = Field(default=15, gt=0)
+    HIMALAYAS_MAX_RETRIES: int = Field(default=1, ge=0)
+    HIMALAYAS_MAX_QUERIES_PER_RUN: int = Field(default=12, ge=1, le=50)
+    HIMALAYAS_MAX_PAGES_PER_QUERY: int = Field(default=3, ge=1, le=10)
+    HIMALAYAS_REQUEST_DELAY_MS: int = Field(default=250, ge=0)
+    HIMALAYAS_DISCOVERY_COOLDOWN_HOURS: int = Field(default=24, ge=0)
+    HIMALAYAS_MAX_JOBS_PER_RUN: int = Field(default=100, ge=1, le=500)
+    HIMALAYAS_SCORE_AFTER_INGESTION: bool = True
+    HIMALAYAS_STORE_REJECTED_CANDIDATES: bool = True
 
     @model_validator(mode="after")
     def validate_hacker_news_limits(self):
