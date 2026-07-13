@@ -6,6 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin, UUIDMixin
 
 if TYPE_CHECKING:
+    from app.models.job_match import JobMatch
     from app.models.user_profile import UserProfile
 
 
@@ -48,3 +49,8 @@ class JobMatchingProfile(Base, UUIDMixin, TimestampMixin):
     notes: Mapped[str | None] = mapped_column(Text)
 
     user_profile: Mapped["UserProfile"] = relationship(back_populates="job_matching_profile")
+    job_matches: Mapped[list["JobMatch"]] = relationship(
+        back_populates="job_matching_profile",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )

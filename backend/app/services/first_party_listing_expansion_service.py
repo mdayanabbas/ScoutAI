@@ -125,14 +125,24 @@ class FirstPartyListingExpansionService:
                 "First-party listing parsed",
                 extra={"job_id": parent.id, "candidate_count": extraction.candidate_count, "reason": extraction.reason},
             )
-            if not extraction.listing_detected:
-                exact = self.detail_parser.parse(
-                    page.html,
-                    source_url=detection.canonical_url,
-                    canonical_url=canonical_url,
-                    company_name=getattr(parent.company, "name", None),
-                    company_domain=company_domain,
+            exact = self.detail_parser.parse(
+                page.html,
+                source_url=detection.canonical_url,
+                canonical_url=canonical_url,
+                company_name=getattr(parent.company, "name", None),
+                company_domain=company_domain,
+            )
+            if exact.success and not _has_multiple_listing_candidates(extraction):
+                return self._complete_unresolved_or_skipped(
+                    parent,
+                    attempt,
+                    scope,
+                    "skipped",
+                    "exact_page_should_use_job_enrichment",
+                    extraction.candidates,
+                    extraction.candidate_count,
                 )
+            if not extraction.listing_detected:
                 if exact.success:
                     return self._complete_unresolved_or_skipped(
                         parent,
@@ -452,6 +462,13 @@ def _select_candidates(candidates: list[FirstPartyListingCandidate], scope: Hiri
     if scope.scope_type == "unknown":
         return [_selected(valid[0])] if len(valid) == 1 else []
     return [_selected(item) for item in sorted(valid, key=lambda item: (-item.scope_score, item.title or ""))[: settings.FIRST_PARTY_LISTING_MAX_CREATE]]
+
+
+def _has_multiple_listing_candidates(extraction: Any) -> bool:
+    valid = [item for item in extraction.candidates if not item.rejection_reason]
+    if len(valid) > 1:
+        return True
+    return extraction.reason == "first_party_listing_detected" and extraction.candidate_count > 1
 
 
 def _selected(candidate: FirstPartyListingCandidate) -> FirstPartyListingCandidate:

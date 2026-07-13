@@ -72,6 +72,7 @@ def _parsed(title="Full Stack Engineer (TS/SCI)", *, success=True, reason="valid
         salary_text=JobFieldValue("$130K - $250K", 0.95, "label"),
         required_skills=JobFieldValue(["TypeScript", "PostgreSQL"], 0.95, "label"),
         technologies=JobFieldValue(["TypeScript", "PostgreSQL"], 0.95, "label"),
+        job_url=JobFieldValue(YC_URL, 0.98, "canonical_yc_job"),
         apply_url=JobFieldValue(YC_URL, 0.75, "canonical"),
         field_confidence={
             "title": 0.98,
@@ -374,3 +375,56 @@ async def test_current_example_titles_are_replaced(db_session):
         updated = JobRepository(db_session).get_by_id(job.id)
         assert updated.title == extracted
         assert updated.role_category == category
+
+
+@pytest.mark.asyncio
+async def test_service_repair_rerun_updates_quality_fields_and_preserves_history(db_session):
+    job = _job(
+        db_session,
+        title="SWE",
+        description="YouÃ¢â‚¬â„¢ll build old systems.",
+        job_url="ycombinator.com/companies/hazel-2/jobs/3epPWgu-full-stack-engineer-ts-sci?utm_source=hn",
+    )
+    JobRepository(db_session).update_job(
+        job,
+        {
+            "work_authorization": "Open menu About YC Interview Guide Recommended jobs",
+            "role_category": "software_engineer",
+            "required_skills_json": ["Hands", "on experience with MCP", "co"],
+        },
+    )
+    parsed = _parsed("Software Engineer")
+    parsed = JobDetailExtractionResult(
+        **{
+            **parsed.__dict__,
+            "description": JobFieldValue("You'll build clean systems. " * 20, 0.95, "main"),
+            "work_authorization": JobFieldValue("Authorized to work in the United States.", 0.9, "authorization_evidence"),
+            "required_skills": JobFieldValue(["Hands-on experience with MCP", "React/Next.js"], 0.95, "label"),
+            "job_url": JobFieldValue(YC_URL + "?utm_source=hn", 0.98, "canonical_yc_job"),
+        }
+    )
+
+    await JobDetailEnrichmentService(db_session, yc_provider=FakeProvider(parsed)).enrich_job(job.id)
+    await JobDetailEnrichmentService(db_session, yc_provider=FakeProvider(parsed)).enrich_job(job.id)
+
+    updated = JobRepository(db_session).get_by_id(job.id)
+    attempts = JobEnrichmentAttemptRepository(db_session).list_by_job_id(job.id)
+    assert updated.title == "Software Engineer"
+    assert "Ã" not in updated.description
+    assert updated.work_authorization == "Authorized to work in the United States."
+    assert updated.required_skills_json == ["Hands-on experience with MCP", "React/Next.js"]
+    assert updated.job_url == YC_URL
+    assert len(attempts) == 2
+
+
+@pytest.mark.asyncio
+async def test_service_canonical_url_rules(db_session):
+    yc_job = _job(db_session, title="Open Roles", job_url="ycombinator.com/companies/hazel-2/jobs/3epPWgu-full-stack-engineer-ts-sci?utm_source=hn")
+    await JobDetailEnrichmentService(db_session, yc_provider=FakeProvider(_parsed())).enrich_job(yc_job.id)
+    assert JobRepository(db_session).get_by_id(yc_job.id).job_url == YC_URL
+
+    ashby_job = _job(db_session, title="Backend Engineer", job_url="https://jobs.ashbyhq.com/lago/exact")
+    parsed = _ashby_parsed()
+    parsed = JobDetailExtractionResult(**{**parsed.__dict__, "job_url": JobFieldValue("https://jobs.ashbyhq.com/lago", 0.98, "ashby_job_url")})
+    await JobDetailEnrichmentService(db_session, ashby_provider=FakeProvider(parsed)).enrich_job(ashby_job.id)
+    assert JobRepository(db_session).get_by_id(ashby_job.id).job_url == "https://jobs.ashbyhq.com/lago/exact"

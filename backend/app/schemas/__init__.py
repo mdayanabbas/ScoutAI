@@ -80,6 +80,14 @@ from app.schemas.job import (
     JobUpdate,
 )
 from app.schemas.job_source import JobSourceDetectionRead
+from app.schemas.job_match import (
+    JobMatchBatchItemRead,
+    JobMatchBatchRead,
+    JobMatchListItemRead,
+    JobMatchListRead,
+    JobMatchRead,
+    JobMatchScoreRequest,
+)
 from app.schemas.job_matching_profile import (
     JobMatchingProfileCreate,
     JobMatchingProfileRead,
@@ -155,6 +163,12 @@ __all__ = [
     "JobRead",
     "JobSourceDetectionRead",
     "JobMatchingProfileCreate",
+    "JobMatchBatchItemRead",
+    "JobMatchBatchRead",
+    "JobMatchListItemRead",
+    "JobMatchListRead",
+    "JobMatchRead",
+    "JobMatchScoreRequest",
     "JobMatchingProfileRead",
     "JobMatchingProfileSummaryRead",
     "JobMatchingProfileUpdate",

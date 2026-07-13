@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.errors import ConflictError, NotFoundError, ValidationAppError
+from app.core.errors import AppError, ConflictError, NotFoundError, ValidationAppError
 from app.db.session import get_db
 from app.jobs.job_source_detector import JobSourceDetector
 from app.repositories.job_enrichment_attempt_repository import (
@@ -282,7 +282,12 @@ async def expand_first_party_listing(
 ):
     job_service.get_job(job_id)
     if (await request.body()).strip():
-        raise ValidationAppError("Request body is not supported", {"body": "not accepted"})
+        raise AppError(
+            code="BAD_REQUEST",
+            message="This endpoint does not accept a request body",
+            status_code=400,
+            details={"body": "not accepted"},
+        )
     running = JobEnrichmentAttemptRepository(db).get_running_for_job(job_id)
     if running is not None:
         logger.info("Concurrent first-party listing expansion rejected", extra={"job_id": job_id})
