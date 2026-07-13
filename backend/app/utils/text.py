@@ -282,12 +282,46 @@ def _meaningful_entry(value: str, *, max_length: int) -> bool:
 
 def _authorization_sentences(text: str) -> list[str]:
     cleaned = repair_mojibake(text) or ""
-    sentences = re.split(r"(?<=[.!?])\s+|\n+", cleaned)
+    protected = re.sub(r"\bU\.S\.", "US_DOT", cleaned, flags=re.IGNORECASE)
+    sentences = re.split(r"(?<=[.!?])\s+|\n+", protected)
     strong = re.compile(
         r"authorized to work|work authorization|visa sponsorship|sponsorship|must be a\s+u\.?s\.?\s+citizen|us citizen only|existing authorization|required right to work|right to work|security clearance|(?:citizenship|eligible|eligibility|required|clearance).{0,80}ts/sci|ts/sci.{0,80}(?:citizenship|eligible|eligibility|required|clearance)",
         re.IGNORECASE,
     )
-    return [normalize_text(sentence) or "" for sentence in sentences if strong.search(sentence)]
+    result: list[str] = []
+    for sentence in sentences:
+        restored = re.sub(r"\bUS_DOT\b", "U.S.", sentence, flags=re.IGNORECASE)
+        if strong.search(restored):
+            focused = _trim_authorization_context(restored)
+            if focused:
+                result.append(focused)
+    return result
+
+
+def _trim_authorization_context(sentence: str) -> str | None:
+    value = normalize_text(sentence)
+    if not value:
+        return None
+    starts = [
+        match.start()
+        for pattern in (
+            r"\bu\.s\. citizenship\b",
+            r"\bus citizenship\b",
+            r"\bmust be a\s+u\.?s\.?\s+citizen\b",
+            r"\bvisa sponsorship\b",
+            r"\bwork authorization\b",
+            r"\bauthorized to work\b",
+            r"\bright to work\b",
+            r"\bsecurity clearance\b",
+            r"\bts/sci\b",
+        )
+        for match in [re.search(pattern, value, re.IGNORECASE)]
+        if match
+    ]
+    if starts:
+        value = value[min(starts):]
+    value = re.split(r"\b(?:Recommended jobs|Footer|Apply now|Related jobs)\b", value, maxsplit=1, flags=re.IGNORECASE)[0]
+    return normalize_text(value)
 
 
 def _bounded_join(items: list[str], maximum: int) -> str | None:
