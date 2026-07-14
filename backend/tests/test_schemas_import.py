@@ -21,6 +21,9 @@ def test_core_schemas_importable():
         PaginatedResponse,
         TechStackItemCreate,
         UserProfileCreate,
+        WWRDiscoveryRequest,
+        WWRDiscoveryResult,
+        WWRFeedPlanRead,
     )
 
     assert all(
@@ -46,5 +49,8 @@ def test_core_schemas_importable():
             PaginatedResponse,
             TechStackItemCreate,
             UserProfileCreate,
+            WWRDiscoveryRequest,
+            WWRDiscoveryResult,
+            WWRFeedPlanRead,
         ]
     )
