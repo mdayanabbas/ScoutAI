@@ -88,6 +88,14 @@ from app.schemas.himalayas_discovery import (
     HimalayasQueryResult,
     HimalayasRejectedCandidateSummary,
 )
+from app.schemas.we_work_remotely_discovery import (
+    WWRAcceptedJobSummary,
+    WWRDiscoveryRequest,
+    WWRDiscoveryResult,
+    WWRFeedPlanRead,
+    WWRFeedResult,
+    WWRRejectedCandidateSummary,
+)
 from app.schemas.job_match import (
     JobMatchBatchItemRead,
     JobMatchBatchRead,
@@ -176,6 +184,12 @@ __all__ = [
     "HimalayasQueryPlanRead",
     "HimalayasQueryResult",
     "HimalayasRejectedCandidateSummary",
+    "WWRAcceptedJobSummary",
+    "WWRDiscoveryRequest",
+    "WWRDiscoveryResult",
+    "WWRFeedPlanRead",
+    "WWRFeedResult",
+    "WWRRejectedCandidateSummary",
     "JobMatchingProfileCreate",
     "JobMatchBatchItemRead",
     "JobMatchBatchRead",
