@@ -13,6 +13,9 @@ from app.services.job_detail_enrichment_service import JobDetailEnrichmentServic
 from app.services.himalayas_remote_job_discovery_service import (
     HimalayasRemoteJobDiscoveryService,
 )
+from app.services.we_work_remotely_discovery_service import (
+    WeWorkRemotelyDiscoveryService,
+)
 from app.services.job_matching_service import JobMatchingService
 from app.services.job_matching_profile_service import JobMatchingProfileService
 from app.services.job_service import JobService
@@ -31,6 +34,7 @@ __all__ = [
     "AshbyBoardExpansionService",
     "JobDetailEnrichmentService",
     "HimalayasRemoteJobDiscoveryService",
+    "WeWorkRemotelyDiscoveryService",
     "JobMatchingService",
     "JobMatchingProfileService",
     "JobService",

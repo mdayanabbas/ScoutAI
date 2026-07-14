@@ -15,6 +15,11 @@ from app.schemas.himalayas_discovery import (
     HimalayasDiscoveryResult,
     HimalayasQueryPlanRead,
 )
+from app.schemas.we_work_remotely_discovery import (
+    WWRDiscoveryRequest,
+    WWRDiscoveryResult,
+    WWRFeedPlanRead,
+)
 from app.discovery.sources.hacker_news.schemas import (
     HackerNewsDiscoveryRequest,
     HackerNewsDiscoveryResponse,
@@ -22,6 +27,9 @@ from app.discovery.sources.hacker_news.schemas import (
 from app.services.discovery_service import DiscoveryService
 from app.services.himalayas_remote_job_discovery_service import (
     HimalayasRemoteJobDiscoveryService,
+)
+from app.services.we_work_remotely_discovery_service import (
+    WeWorkRemotelyDiscoveryService,
 )
 from app.utils.enums import DiscoveryRunStatus, DiscoverySource
 
@@ -34,6 +42,10 @@ def get_discovery_service(db: Session = Depends(get_db)) -> DiscoveryService:
 
 def get_himalayas_service(db: Session = Depends(get_db)) -> HimalayasRemoteJobDiscoveryService:
     return HimalayasRemoteJobDiscoveryService(db)
+
+
+def get_we_work_remotely_service(db: Session = Depends(get_db)) -> WeWorkRemotelyDiscoveryService:
+    return WeWorkRemotelyDiscoveryService(db)
 
 
 @router.post(
@@ -99,6 +111,36 @@ async def run_himalayas_job_discovery(
         force=request.force,
         max_queries=request.max_queries,
         max_pages_per_query=request.max_pages_per_query,
+        score_after_ingestion=request.score_after_ingestion,
+    )
+
+
+@router.get(
+    "/we-work-remotely/jobs/feed-plan",
+    response_model=WWRFeedPlanRead,
+    summary="Preview targeted We Work Remotely RSS feeds",
+)
+def preview_we_work_remotely_feed_plan(
+    include_all_other: bool | None = None,
+    service: WeWorkRemotelyDiscoveryService = Depends(get_we_work_remotely_service),
+):
+    return service.feed_plan_result(include_all_other=include_all_other)
+
+
+@router.post(
+    "/we-work-remotely/jobs",
+    response_model=WWRDiscoveryResult,
+    summary="Run targeted We Work Remotely RSS job discovery",
+)
+async def run_we_work_remotely_job_discovery(
+    data: WWRDiscoveryRequest | None = None,
+    service: WeWorkRemotelyDiscoveryService = Depends(get_we_work_remotely_service),
+):
+    request = data or WWRDiscoveryRequest()
+    return await service.run_discovery(
+        force=request.force,
+        include_all_other=request.include_all_other,
+        max_items_per_feed=request.max_items_per_feed,
         score_after_ingestion=request.score_after_ingestion,
     )
 
