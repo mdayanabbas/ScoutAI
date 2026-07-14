@@ -114,6 +114,20 @@ class Settings(BaseSettings):
     HIMALAYAS_MAX_JOBS_PER_RUN: int = Field(default=100, ge=1, le=500)
     HIMALAYAS_SCORE_AFTER_INGESTION: bool = True
     HIMALAYAS_STORE_REJECTED_CANDIDATES: bool = True
+    WWR_DISCOVERY_ENABLED: bool = True
+    WWR_PROGRAMMING_RSS_URL: str = "https://weworkremotely.com/categories/remote-programming-jobs.rss"
+    WWR_ALL_OTHER_RSS_URL: str = "https://weworkremotely.com/categories/all-other-remote-jobs.rss"
+    WWR_INCLUDE_ALL_OTHER_FEED: bool = True
+    WWR_REQUEST_TIMEOUT_SECONDS: int = Field(default=15, gt=0)
+    WWR_MAX_RETRIES: int = Field(default=1, ge=0)
+    WWR_MAX_RESPONSE_BYTES: int = Field(default=5_000_000, gt=0)
+    WWR_DISCOVERY_COOLDOWN_HOURS: int = Field(default=6, ge=0)
+    WWR_MAX_ITEMS_PER_FEED: int = Field(default=200, ge=1, le=500)
+    WWR_MAX_JOBS_PER_RUN: int = Field(default=100, ge=1, le=500)
+    WWR_SCORE_AFTER_INGESTION: bool = True
+    WWR_STORE_REJECTED_CANDIDATES: bool = True
+    WWR_USE_CONDITIONAL_REQUESTS: bool = True
+    WWR_MAX_JOB_AGE_DAYS: int = Field(default=45, ge=1, le=365)
 
     @model_validator(mode="after")
     def validate_hacker_news_limits(self):
