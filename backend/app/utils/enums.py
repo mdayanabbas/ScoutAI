@@ -27,6 +27,7 @@ class DiscoverySource(StrEnum):
     HACKER_NEWS = "hacker_news"
     HIMALAYAS = "himalayas"
     WE_WORK_REMOTELY = "we_work_remotely"
+    REMOTIVE = "remotive"
     PRODUCT_HUNT = "product_hunt"
     YC = "yc"
     WELLFOUND = "wellfound"

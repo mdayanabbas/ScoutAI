@@ -96,6 +96,15 @@ from app.schemas.we_work_remotely_discovery import (
     WWRFeedResult,
     WWRRejectedCandidateSummary,
 )
+from app.schemas.remotive_discovery import (
+    RemotiveAcceptedJobSummary,
+    RemotiveDiscoveryRequest,
+    RemotiveDiscoveryResult,
+    RemotivePlannedRequestRead,
+    RemotiveQueryPlanRead,
+    RemotiveQueryResult,
+    RemotiveRejectedCandidateSummary,
+)
 from app.schemas.job_match import (
     JobMatchBatchItemRead,
     JobMatchBatchRead,
@@ -190,6 +199,13 @@ __all__ = [
     "WWRFeedPlanRead",
     "WWRFeedResult",
     "WWRRejectedCandidateSummary",
+    "RemotiveAcceptedJobSummary",
+    "RemotiveDiscoveryRequest",
+    "RemotiveDiscoveryResult",
+    "RemotivePlannedRequestRead",
+    "RemotiveQueryPlanRead",
+    "RemotiveQueryResult",
+    "RemotiveRejectedCandidateSummary",
     "JobMatchingProfileCreate",
     "JobMatchBatchItemRead",
     "JobMatchBatchRead",

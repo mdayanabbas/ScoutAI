@@ -128,6 +128,22 @@ class Settings(BaseSettings):
     WWR_STORE_REJECTED_CANDIDATES: bool = True
     WWR_USE_CONDITIONAL_REQUESTS: bool = True
     WWR_MAX_JOB_AGE_DAYS: int = Field(default=45, ge=1, le=365)
+    REMOTIVE_DISCOVERY_ENABLED: bool = True
+    REMOTIVE_API_BASE_URL: str = "https://remotive.com"
+    REMOTIVE_JOBS_PATH: str = "/api/remote-jobs"
+    REMOTIVE_REQUEST_TIMEOUT_SECONDS: int = Field(default=20, gt=0)
+    REMOTIVE_MAX_RETRIES: int = Field(default=1, ge=0)
+    REMOTIVE_MAX_RESPONSE_BYTES: int = Field(default=10_000_000, gt=0)
+    REMOTIVE_DISCOVERY_COOLDOWN_HOURS: int = Field(default=6, ge=0)
+    REMOTIVE_MAX_REQUESTS_PER_RUN: int = Field(default=4, ge=1, le=10)
+    REMOTIVE_MAX_JOBS_PER_REQUEST: int = Field(default=200, ge=1, le=500)
+    REMOTIVE_MAX_JOBS_PER_RUN: int = Field(default=100, ge=1, le=500)
+    REMOTIVE_SCORE_AFTER_INGESTION: bool = True
+    REMOTIVE_STORE_REJECTED_CANDIDATES: bool = True
+    REMOTIVE_SOFTWARE_CATEGORY_ENABLED: bool = True
+    REMOTIVE_DATA_CATEGORY_ENABLED: bool = True
+    REMOTIVE_REQUEST_DELAY_MS: int = Field(default=1000, ge=0)
+    REMOTIVE_MAX_JOB_AGE_DAYS: int = Field(default=45, ge=1, le=365)
 
     @model_validator(mode="after")
     def validate_hacker_news_limits(self):
