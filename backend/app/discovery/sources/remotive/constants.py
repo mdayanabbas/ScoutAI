@@ -1,0 +1,6 @@
+REMOTIVE_SOURCE = "remotive"
+REMOTIVE_PROVIDER = "remotive_remote_jobs"
+REMOTIVE_ATTRIBUTION_LABEL = "Remotive"
+REMOTIVE_HOME_URL = "https://remotive.com"
+REMOTIVE_ALLOWED_HOST = "remotive.com"
+REMOTIVE_SOFTWARE_CATEGORY = "software-dev"
