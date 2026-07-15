@@ -20,6 +20,11 @@ from app.schemas.we_work_remotely_discovery import (
     WWRDiscoveryResult,
     WWRFeedPlanRead,
 )
+from app.schemas.remotive_discovery import (
+    RemotiveDiscoveryRequest,
+    RemotiveDiscoveryResult,
+    RemotiveQueryPlanRead,
+)
 from app.discovery.sources.hacker_news.schemas import (
     HackerNewsDiscoveryRequest,
     HackerNewsDiscoveryResponse,
@@ -30,6 +35,9 @@ from app.services.himalayas_remote_job_discovery_service import (
 )
 from app.services.we_work_remotely_discovery_service import (
     WeWorkRemotelyDiscoveryService,
+)
+from app.services.remotive_remote_job_discovery_service import (
+    RemotiveRemoteJobDiscoveryService,
 )
 from app.utils.enums import DiscoveryRunStatus, DiscoverySource
 
@@ -46,6 +54,10 @@ def get_himalayas_service(db: Session = Depends(get_db)) -> HimalayasRemoteJobDi
 
 def get_we_work_remotely_service(db: Session = Depends(get_db)) -> WeWorkRemotelyDiscoveryService:
     return WeWorkRemotelyDiscoveryService(db)
+
+
+def get_remotive_service(db: Session = Depends(get_db)) -> RemotiveRemoteJobDiscoveryService:
+    return RemotiveRemoteJobDiscoveryService(db)
 
 
 @router.post(
@@ -141,6 +153,37 @@ async def run_we_work_remotely_job_discovery(
         force=request.force,
         include_all_other=request.include_all_other,
         max_items_per_feed=request.max_items_per_feed,
+        score_after_ingestion=request.score_after_ingestion,
+    )
+
+
+@router.get(
+    "/remotive/jobs/query-plan",
+    response_model=RemotiveQueryPlanRead,
+    summary="Preview targeted Remotive remote-job requests",
+)
+def preview_remotive_job_queries(
+    max_requests: int | None = Query(default=None, ge=1, le=10),
+    limit_per_request: int | None = Query(default=None, ge=1, le=500),
+    service: RemotiveRemoteJobDiscoveryService = Depends(get_remotive_service),
+):
+    return service.query_plan_result(max_requests=max_requests, limit_per_request=limit_per_request)
+
+
+@router.post(
+    "/remotive/jobs",
+    response_model=RemotiveDiscoveryResult,
+    summary="Run targeted Remotive remote-job discovery",
+)
+async def run_remotive_job_discovery(
+    data: RemotiveDiscoveryRequest | None = None,
+    service: RemotiveRemoteJobDiscoveryService = Depends(get_remotive_service),
+):
+    request = data or RemotiveDiscoveryRequest()
+    return await service.run_discovery(
+        force=request.force,
+        max_requests=request.max_requests,
+        limit_per_request=request.limit_per_request,
         score_after_ingestion=request.score_after_ingestion,
     )
 
