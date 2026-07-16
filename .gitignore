@@ -15,6 +15,9 @@ dist/
 .env.local
 .env.*.local
 
+# Local resume uploads
+/backend/storage/resumes/
+
 # Command Code
 .commandcode/
 
