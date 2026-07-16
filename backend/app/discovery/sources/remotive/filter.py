@@ -88,6 +88,8 @@ def _role(title: str, text: str) -> tuple[str, str]:
         return RoleCategory.AI_ENGINEER.value, "target"
     if "machine learning engineer" in value or "ml engineer" in value or value == "mle":
         return RoleCategory.ML_ENGINEER.value, "target"
+    if _has(value, r"\b(engineering manager|engineering lead|engineering director|head of engineering)\b"):
+        return RoleCategory.SOFTWARE_ENGINEER.value, "target"
     if value in {"swe", "sde"} or "software engineer" in value or "software development engineer" in value or "software developer" in value:
         return RoleCategory.SOFTWARE_ENGINEER.value, "target"
     if "backend engineer" in value or "backend developer" in value or "backend ai engineer" in value:
@@ -131,7 +133,7 @@ def _seniority(title: str, description: str | None) -> tuple[str | None, str]:
     if exp_min is not None and exp_min >= 5:
         return "senior", "senior"
     if exp_min == 4:
-        return "mid_level", "senior"
+        return "mid_level", "experience"
     if exp_min == 3:
         return "mid_level", "stretch"
     return None, "open"
