@@ -144,6 +144,16 @@ class Settings(BaseSettings):
     REMOTIVE_DATA_CATEGORY_ENABLED: bool = True
     REMOTIVE_REQUEST_DELAY_MS: int = Field(default=1000, ge=0)
     REMOTIVE_MAX_JOB_AGE_DAYS: int = Field(default=45, ge=1, le=365)
+    RESUME_UPLOADS_DIR: str = "./storage/resumes"
+    RESUME_MAX_FILE_SIZE_BYTES: int = Field(default=5_000_000, gt=0)
+    RESUME_ALLOWED_CONTENT_TYPES: str = (
+        "application/pdf,"
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document,"
+        "text/plain,"
+        "application/octet-stream"
+    )
+    RESUME_ALLOWED_EXTENSIONS: str = ".pdf,.docx,.txt"
+    RESUME_TEXT_EXTRACTION_MAX_CHARS: int = Field(default=100_000, gt=0)
 
     @model_validator(mode="after")
     def validate_hacker_news_limits(self):

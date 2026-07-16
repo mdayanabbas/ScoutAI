@@ -14,6 +14,7 @@ def test_all_models_importable():
         JobDiscoveryLink,
         JobMatch,
         JobMatchingProfile,
+        Resume,
         TechStackItem,
         UserProfile,
     )
@@ -34,6 +35,7 @@ def test_all_models_importable():
             JobDiscoveryLink,
             JobMatch,
             JobMatchingProfile,
+            Resume,
             TechStackItem,
             UserProfile,
         ]

@@ -134,6 +134,20 @@ from app.schemas.remote_discovery import (
     RemoteRecommendationSummary,
     WWRRemoteDiscoveryOptions,
 )
+from app.schemas.resume import (
+    ResumeActivateResponse,
+    ResumeListResponse,
+    ResumeResponse,
+    ResumeUploadResponse,
+)
+from app.schemas.resume_improvement import (
+    ResumeBulletSuggestion,
+    ResumeImprovementItem,
+    ResumeImprovementRequest,
+    ResumeImprovementResponse,
+    ResumeSectionSuggestion,
+    ResumeSkillGapSuggestion,
+)
 from app.schemas.job_match import (
     JobMatchBatchItemRead,
     JobMatchBatchRead,
@@ -255,6 +269,16 @@ __all__ = [
     "RemoteJobDiscoveryPlanRead",
     "RemoteJobDiscoveryRunRequest",
     "RemoteRecommendationSummary",
+    "ResumeActivateResponse",
+    "ResumeBulletSuggestion",
+    "ResumeImprovementItem",
+    "ResumeImprovementRequest",
+    "ResumeImprovementResponse",
+    "ResumeListResponse",
+    "ResumeResponse",
+    "ResumeSectionSuggestion",
+    "ResumeSkillGapSuggestion",
+    "ResumeUploadResponse",
     "WWRRemoteDiscoveryOptions",
     "JobMatchingProfileCreate",
     "JobMatchBatchItemRead",

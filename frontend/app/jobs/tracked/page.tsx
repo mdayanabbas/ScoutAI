@@ -2,7 +2,10 @@
 
 import { useMemo, useState } from "react";
 
+import { ApplicationPacketPanel } from "@/components/applications/ApplicationPacketPanel";
 import { ApplicationPrepPanel } from "@/components/applications/ApplicationPrepPanel";
+import { ResumeGapAnalysis } from "@/components/applications/ResumeGapAnalysis";
+import { ResumeImprovementPanel } from "@/components/applications/ResumeImprovementPanel";
 import { PageHeader } from "@/components/layout/PageHeader";
 import {
   decisionStatusLabel,
@@ -15,9 +18,19 @@ import {
   normalizeExternalUrl,
 } from "@/components/recommendations/recommendation-format";
 import { useJobDecisions, useJobDecisionStatusCounts } from "@/hooks/use-job-decisions";
+import {
+  generateApplicationPacketForDecision,
+  generateApplicationPacketForJob,
+} from "@/lib/application-packet-api";
 import { generateApplicationPrepForDecision } from "@/lib/application-prep-api";
+import {
+  generateResumeImprovementForDecision,
+  generateResumeImprovementForJob,
+} from "@/lib/resume-improvements-api";
+import type { ApplicationPacketResponse } from "@/types/application-packet";
 import type { ApplicationPrepResponse } from "@/types/application-prep";
 import type { JobDecisionListItem, JobDecisionStatus } from "@/types/job-decision";
+import type { ResumeImprovementResponse } from "@/types/resume-improvement";
 
 const filters: Array<{ label: string; value: string }> = [
   { label: "All", value: "" },
@@ -35,6 +48,12 @@ export default function TrackedJobsPage() {
   const [prepByDecisionId, setPrepByDecisionId] = useState<Record<string, ApplicationPrepResponse>>({});
   const [prepErrors, setPrepErrors] = useState<Record<string, string>>({});
   const [pendingDecisionId, setPendingDecisionId] = useState<string | null>(null);
+  const [packetByDecisionId, setPacketByDecisionId] = useState<Record<string, ApplicationPacketResponse>>({});
+  const [packetErrors, setPacketErrors] = useState<Record<string, string>>({});
+  const [packetPendingDecisionId, setPacketPendingDecisionId] = useState<string | null>(null);
+  const [improvementByDecisionId, setImprovementByDecisionId] = useState<Record<string, ResumeImprovementResponse>>({});
+  const [improvementErrors, setImprovementErrors] = useState<Record<string, string>>({});
+  const [improvementPendingDecisionId, setImprovementPendingDecisionId] = useState<string | null>(null);
   const decisionsQuery = useJobDecisions({
     limit: 50,
     include_archived: status === "archived",
@@ -63,6 +82,61 @@ export default function TrackedJobsPage() {
       }));
     } finally {
       setPendingDecisionId(null);
+    }
+  }
+
+  async function generatePacket(decision: JobDecisionListItem) {
+    setPacketPendingDecisionId(decision.id);
+    setPacketErrors((current) => {
+      const next = { ...current };
+      delete next[decision.id];
+      return next;
+    });
+    try {
+      const packet = decision.id
+        ? await generateApplicationPacketForDecision(decision.id)
+        : await generateApplicationPacketForJob(decision.job_id);
+      setPacketByDecisionId((current) => ({ ...current, [decision.id]: packet }));
+      await decisionsQuery.refetch();
+      await countsQuery.refetch();
+    } catch (error) {
+      setPacketErrors((current) => ({
+        ...current,
+        [decision.id]:
+          error instanceof Error ? error.message : "Could not generate application packet.",
+      }));
+    } finally {
+      setPacketPendingDecisionId(null);
+    }
+  }
+
+  async function improveResume(decision: JobDecisionListItem) {
+    setImprovementPendingDecisionId(decision.id);
+    setImprovementErrors((current) => {
+      const next = { ...current };
+      delete next[decision.id];
+      return next;
+    });
+    try {
+      const improvement = decision.id
+        ? await generateResumeImprovementForDecision(decision.id)
+        : await generateResumeImprovementForJob(decision.job_id);
+      setImprovementByDecisionId((current) => ({
+        ...current,
+        [decision.id]: improvement,
+      }));
+      await decisionsQuery.refetch();
+      await countsQuery.refetch();
+    } catch (error) {
+      setImprovementErrors((current) => ({
+        ...current,
+        [decision.id]:
+          error instanceof Error
+            ? error.message
+            : "Could not generate resume improvement suggestions.",
+      }));
+    } finally {
+      setImprovementPendingDecisionId(null);
     }
   }
 
@@ -120,6 +194,14 @@ export default function TrackedJobsPage() {
               prepPending={pendingDecisionId === decision.id}
               prepError={prepErrors[decision.id]}
               onPrepare={() => prepareDecision(decision)}
+              packet={packetByDecisionId[decision.id]}
+              packetPending={packetPendingDecisionId === decision.id}
+              packetError={packetErrors[decision.id]}
+              onGeneratePacket={() => generatePacket(decision)}
+              improvement={improvementByDecisionId[decision.id]}
+              improvementPending={improvementPendingDecisionId === decision.id}
+              improvementError={improvementErrors[decision.id]}
+              onImproveResume={() => improveResume(decision)}
             />
           ))}
         </section>
@@ -134,12 +216,28 @@ function TrackedJobCard({
   prepPending,
   prepError,
   onPrepare,
+  packet,
+  packetPending,
+  packetError,
+  onGeneratePacket,
+  improvement,
+  improvementPending,
+  improvementError,
+  onImproveResume,
 }: {
   decision: JobDecisionListItem;
   prep?: ApplicationPrepResponse | null;
   prepPending: boolean;
   prepError?: string;
   onPrepare: () => void;
+  packet?: ApplicationPacketResponse | null;
+  packetPending: boolean;
+  packetError?: string;
+  onGeneratePacket: () => void;
+  improvement?: ResumeImprovementResponse | null;
+  improvementPending: boolean;
+  improvementError?: string;
+  onImproveResume: () => void;
 }) {
   const applyUrl = normalizeExternalUrl(decision.apply_url) ?? normalizeExternalUrl(decision.job_url);
   const salary = formatSalary({
@@ -188,6 +286,30 @@ function TrackedJobCard({
           >
             {prepPending ? "Preparing..." : prep ? "Regenerate Prep" : "Prepare Application"}
           </button>
+          <button
+            type="button"
+            onClick={onGeneratePacket}
+            disabled={packetPending}
+            className="rounded border border-[#166534] bg-white px-3 py-2 text-sm font-medium text-[#166534] hover:bg-[#f0fdf4] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {packetPending
+              ? "Generating packet..."
+              : packet
+                ? "Regenerate Packet"
+                : "Generate Packet"}
+          </button>
+          <button
+            type="button"
+            onClick={onImproveResume}
+            disabled={improvementPending}
+            className="rounded border border-[#7c3aed] bg-white px-3 py-2 text-sm font-medium text-[#6d28d9] hover:bg-[#f5f3ff] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {improvementPending
+              ? "Generating resume suggestions..."
+              : improvement
+                ? "Regenerate Resume Suggestions"
+                : "Improve Resume"}
+          </button>
         </div>
       </div>
 
@@ -210,6 +332,57 @@ function TrackedJobCard({
       ) : null}
 
       {prep ? <ApplicationPrepPanel prep={prep} compact={!prepByDecisionHasDetails(prep)} /> : null}
+
+      {!packet && !packetPending && !packetError ? (
+        <p className="mt-4 rounded border border-[#edf0f5] bg-[#fcfcfd] px-3 py-2 text-sm text-[#667085]">
+          Generate packet to compare this job with your resume.
+        </p>
+      ) : null}
+
+      {packetError ? (
+        <div className="mt-4 rounded border border-[#fecaca] bg-[#fff7f7] p-3 text-sm text-[#991b1b]">
+          <div className="font-medium">Could not generate application packet.</div>
+          <p className="mt-1">{packetError}</p>
+          <button
+            type="button"
+            onClick={onGeneratePacket}
+            className="mt-3 rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white"
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
+
+      {packet?.resume_used ? (
+        <div className="mt-4">
+          <ResumeGapAnalysis
+            resumeUsed={packet.resume_used}
+            resumeMatchSummary={packet.resume_match_summary}
+            resumeStrengths={packet.resume_strengths}
+            resumeGaps={packet.resume_gaps}
+            resumeBulletSources={packet.resume_bullet_sources}
+            compact
+          />
+        </div>
+      ) : null}
+
+      {packet ? <ApplicationPacketPanel packet={packet} /> : null}
+
+      {improvementError ? (
+        <div className="mt-4 rounded border border-[#fecaca] bg-[#fff7f7] p-3 text-sm text-[#991b1b]">
+          <div className="font-medium">Could not generate resume improvement suggestions.</div>
+          <p className="mt-1">{improvementError}</p>
+          <button
+            type="button"
+            onClick={onImproveResume}
+            className="mt-3 rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white"
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
+
+      {improvement ? <ResumeImprovementPanel improvement={improvement} /> : null}
     </article>
   );
 }

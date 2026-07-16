@@ -15,6 +15,8 @@ from app.api.v1.jobs import router as jobs_router
 from app.api.v1.job_application_decisions import router as job_application_decisions_router
 from app.api.v1.job_matches import router as job_matches_router
 from app.api.v1.profiles import router as profiles_router
+from app.api.v1.resumes import router as resumes_router
+from app.api.v1.resume_improvements import router as resume_improvements_router
 from app.api.v1.tech_stack import router as tech_stack_router
 
 api_router = APIRouter()
@@ -33,4 +35,6 @@ api_router.include_router(jobs_router)
 api_router.include_router(job_application_decisions_router)
 api_router.include_router(job_matches_router)
 api_router.include_router(profiles_router)
+api_router.include_router(resumes_router)
+api_router.include_router(resume_improvements_router)
 api_router.include_router(tech_stack_router)

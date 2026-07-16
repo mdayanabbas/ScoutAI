@@ -15,6 +15,7 @@ from app.repositories.job_match_repository import JobMatchRepository
 from app.repositories.job_matching_profile_repository import JobMatchingProfileRepository
 from app.repositories.job_repository import JobRepository
 from app.repositories.profile_repository import UserProfileRepository
+from app.repositories.resume_repository import ResumeRepository
 from app.schemas.application_packet import (
     ApplicationPacketItem,
     ApplicationPacketRequest,
@@ -36,6 +37,7 @@ class ApplicationPacketService:
         self.profile_repository = JobMatchingProfileRepository(session)
         self.match_repository = JobMatchRepository(session)
         self.decision_repository = JobApplicationDecisionRepository(session)
+        self.resume_repository = ResumeRepository(session)
         self.prep_service = ApplicationPrepService(session)
 
     def generate_for_job(self, job_id: str, request: ApplicationPacketRequest) -> ApplicationPacketResponse:
@@ -45,12 +47,13 @@ class ApplicationPacketService:
         user_profile, profile = self._current_profiles()
         match = self._match_for(profile, job.id)
         decision = self.decision_repository.get_by_job_and_user_profile(job.id, user_profile.id)
-        packet = self._build_packet(job, profile, match, decision, request)
+        resume = self.resume_repository.get_active_for_user_profile(user_profile.id)
+        packet = self._build_packet(job, profile, match, decision, request, resume)
         if request.update_decision:
             decision = self._upsert_decision(job, user_profile, match, decision, packet)
             packet.decision_id = decision.id
             logger.info("Application packet decision updated", extra={"job_id": job.id, "decision_id": decision.id})
-        logger.info("Application packet generated", extra={"job_id": job.id, "decision_id": packet.decision_id})
+        logger.info("Application packet generated", extra={"job_id": job.id, "decision_id": packet.decision_id, "resume_used": packet.resume_used})
         return packet
 
     def generate_for_decision(self, decision_id: str, request: ApplicationPacketRequest) -> ApplicationPacketResponse:
@@ -62,12 +65,13 @@ class ApplicationPacketService:
         if job is None:
             raise NotFoundError("Job not found")
         match = self._match_for(profile, job.id)
-        packet = self._build_packet(job, profile, match, decision, request)
+        resume = self.resume_repository.get_active_for_user_profile(user_profile.id)
+        packet = self._build_packet(job, profile, match, decision, request, resume)
         if request.update_decision:
             decision = self._upsert_decision(job, user_profile, match, decision, packet)
             packet.decision_id = decision.id
             logger.info("Application packet decision updated", extra={"job_id": job.id, "decision_id": decision.id})
-        logger.info("Application packet generated", extra={"job_id": job.id, "decision_id": packet.decision_id})
+        logger.info("Application packet generated", extra={"job_id": job.id, "decision_id": packet.decision_id, "resume_used": packet.resume_used})
         return packet
 
     def _current_profiles(self) -> tuple[UserProfile, JobMatchingProfile | None]:
@@ -88,14 +92,20 @@ class ApplicationPacketService:
         match: JobMatch | None,
         decision: JobApplicationDecision | None,
         request: ApplicationPacketRequest,
+        resume: Any | None = None,
     ) -> ApplicationPacketResponse:
         prep = self.prep_service.generate_for_job(
             job.id,
             ApplicationPrepRequest(update_decision=False),
         )
-        positioning = _application_positioning(job, profile, match)
+        resume_context = _resume_context(job, resume)
+        positioning = _application_positioning(job, profile, match, resume_context)
         resume_focus = _resume_focus(job, profile, match)
         risks = _risks_to_verify(job, match)
+        if not resume_context["resume_used"]:
+            risks.append(_item("Risk", "No active resume uploaded; packet is based on profile and job evidence only.", "Upload an active resume to make packet evidence more specific."))
+        else:
+            risks.extend(resume_context["resume_gaps"])
         return ApplicationPacketResponse(
             job_id=job.id,
             decision_id=decision.id if decision else None,
@@ -105,9 +115,15 @@ class ApplicationPacketService:
             match_tier=getattr(match, "match_tier", None),
             total_score=getattr(match, "total_score", None),
             remote_eligibility=getattr(match, "remote_eligibility", None),
+            resume_id=resume_context["resume_id"],
+            resume_used=resume_context["resume_used"],
+            resume_match_summary=resume_context["summary"],
+            resume_strengths=resume_context["resume_strengths"],
+            resume_gaps=resume_context["resume_gaps"],
+            resume_bullet_sources=resume_context["resume_bullet_sources"],
             application_positioning=positioning,
             resume_focus=resume_focus,
-            resume_bullet_suggestions=_resume_bullets(job, profile) if request.include_resume_bullets else [],
+            resume_bullet_suggestions=_resume_bullets(job, profile, resume_context) if request.include_resume_bullets else [],
             project_evidence_to_use=_project_evidence(job),
             cover_note_outline=_cover_note_outline(job, profile, match) if request.include_cover_note_outline else None,
             cold_dm_outline=_cold_dm_outline(job) if request.include_cold_dm_outline else None,
@@ -169,8 +185,13 @@ class ApplicationPacketService:
         )
 
 
-def _application_positioning(job: Job, profile: JobMatchingProfile | None, match: JobMatch | None) -> str:
+def _application_positioning(job: Job, profile: JobMatchingProfile | None, match: JobMatch | None, resume_context: dict[str, Any] | None = None) -> str:
     role = _role_key(job)
+    resume_context = resume_context or {}
+    resume_strengths = [item.value for item in resume_context.get("resume_strengths", [])]
+    if resume_context.get("resume_used") and resume_strengths:
+        phrase = ", ".join(resume_strengths[:4])
+        return f"Position this application around your {phrase} evidence shown in the uploaded resume."
     supported = _overlap_labels(_profile_terms(profile), _job_terms(job))
     skill_phrase = ", ".join(supported[:4])
     if role in {"ml_engineer", "ai_engineer"}:
@@ -199,7 +220,14 @@ def _resume_focus(job: Job, profile: JobMatchingProfile | None, match: JobMatch 
     return _dedupe_items(points)[:8]
 
 
-def _resume_bullets(job: Job, profile: JobMatchingProfile | None) -> list[ApplicationPacketItem]:
+def _resume_bullets(job: Job, profile: JobMatchingProfile | None, resume_context: dict[str, Any] | None = None) -> list[ApplicationPacketItem]:
+    resume_context = resume_context or {}
+    if resume_context.get("resume_used"):
+        items = list(resume_context.get("resume_bullet_sources", []))
+        for gap in resume_context.get("resume_gaps", [])[:3]:
+            items.append(_item("Resume gap", f"Consider adding evidence for {gap.value} if you have it.", "Gap detected between job requirements and uploaded resume."))
+        if items:
+            return items[:8]
     terms = set(_overlap_labels(_profile_terms(profile), _job_terms(job)))
     bullets = [
         ("Built backend APIs for AI workflows using Python and FastAPI, with structured outputs and validation.", {"Python", "FastAPI"}),
@@ -401,6 +429,111 @@ def _job_terms(job: Job) -> set[str]:
             terms.add(normalize_title(label))
     terms.discard("")
     return terms
+
+
+def _resume_context(job: Job, resume: Any | None) -> dict[str, Any]:
+    if resume is None or resume.parse_status != "parsed":
+        return {
+            "resume_id": getattr(resume, "id", None),
+            "resume_used": False,
+            "summary": "No active parsed resume is available.",
+            "resume_strengths": [],
+            "resume_gaps": [],
+            "resume_bullet_sources": [],
+        }
+    resume_terms = _resume_terms(resume)
+    job_terms = _job_terms(job)
+    overlap = sorted(job_terms & resume_terms)
+    missing = sorted(job_terms - resume_terms)
+    strengths = [
+        _item("Resume strength", _label_from_key(term, resume), "Present in uploaded resume and relevant to this job.")
+        for term in overlap[:8]
+    ]
+    gaps = [
+        _item("Resume gap", _display_term(term), "Job signal not found in uploaded resume.")
+        for term in missing[:6]
+        if term not in {"software engineer", "ai engineer", "ml engineer"}
+    ]
+    text = " ".join(
+        str(value or "")
+        for value in (
+            resume.raw_text,
+            " ".join(resume.skills_json or []),
+            " ".join(resume.technologies_json or []),
+        )
+    ).lower()
+    if "remote" not in text and "async" not in text:
+        gaps.append(_item("Resume gap", "remote collaboration", "Remote work evidence was not found in uploaded resume."))
+    if _role_key(job) in {"ai_engineer", "ml_engineer"} and not ({"llms", "machine learning"} & resume_terms):
+        gaps.append(_item("Resume gap", "ML or LLM evidence", "AI role but uploaded resume has limited ML/LLM signal."))
+    if {"aws", "docker", "kubernetes"} & job_terms and not ({"aws", "docker", "kubernetes"} & resume_terms):
+        gaps.append(_item("Resume gap", "deployment or cloud evidence", "Job asks for deployment/cloud skills not found in uploaded resume."))
+    bullets = [
+        _item("Resume bullet", f"Emphasize {item.value} work from your uploaded resume.", "Resume-supported packet suggestion.")
+        for item in strengths[:5]
+    ]
+    summary = (
+        f"Uploaded resume overlaps with {', '.join(item.value for item in strengths[:4])}."
+        if strengths
+        else "Uploaded resume was parsed, but no direct job-skill overlap was detected."
+    )
+    return {
+        "resume_id": resume.id,
+        "resume_used": True,
+        "summary": summary,
+        "resume_strengths": strengths,
+        "resume_gaps": _dedupe_items(gaps)[:8],
+        "resume_bullet_sources": bullets,
+    }
+
+
+def _resume_terms(resume: Any) -> set[str]:
+    terms: set[str] = set()
+    for value in (resume.skills_json or []) + (resume.technologies_json or []):
+        key = normalize_title(str(value))
+        if key:
+            terms.add(key)
+    for project in resume.projects_json or []:
+        if isinstance(project, dict):
+            text = " ".join(str(project.get(key, "")) for key in ("title", "text"))
+        else:
+            text = str(project)
+        for key in _text_terms(text):
+            terms.add(key)
+    return terms
+
+
+def _text_terms(text: str) -> set[str]:
+    lowered = text.lower()
+    aliases = {
+        "python": "python",
+        "fastapi": "fastapi",
+        "postgresql": "postgresql",
+        "postgres": "postgresql",
+        "docker": "docker",
+        "kubernetes": "kubernetes",
+        "aws": "aws",
+        "llm": "llms",
+        "llms": "llms",
+        "machine learning": "machine learning",
+    }
+    return {normalize_title(label) for token, label in aliases.items() if token in lowered}
+
+
+def _label_from_key(term: str, resume: Any) -> str:
+    for value in (resume.skills_json or []) + (resume.technologies_json or []):
+        if normalize_title(str(value)) == term:
+            return str(value)
+    return _display_term(term)
+
+
+def _display_term(term: str) -> str:
+    return {
+        "llms": "LLMs",
+        "postgresql": "PostgreSQL",
+        "fastapi": "FastAPI",
+        "aws": "AWS",
+    }.get(term, term.title())
 
 
 def _overlap_labels(profile_terms: dict[str, str], job_terms: set[str]) -> list[str]:

@@ -12,6 +12,7 @@ const navigation = [
   { name: "Outreach", href: "/outreach", icon: "O" },
   { name: "CRM", href: "/crm", icon: "M" },
   { name: "Profile", href: "/profile", icon: "P" },
+  { name: "Resume", href: "/profile/resume", icon: "V" },
   { name: "Agent Runs", href: "/agent-runs", icon: "A" },
 ];
 
