@@ -12,9 +12,31 @@ import {
   labelize,
   sourceAttribution,
 } from "@/components/recommendations/recommendation-format";
+import type {
+  JobApplicationDecisionResponse,
+  JobDecisionPayload,
+  JobDecisionPriority,
+  JobDecisionStatus,
+} from "@/types/job-decision";
 import type { RecommendedJobMatch } from "@/types/job-match";
+import { useEffect, useState } from "react";
 
-export function RecommendedJobCard({ job }: { job: RecommendedJobMatch }) {
+export function RecommendedJobCard({
+  job,
+  decision,
+  decisionPending = false,
+  onDecisionAction,
+  onDecisionUpdate,
+}: {
+  job: RecommendedJobMatch;
+  decision?: JobApplicationDecisionResponse | null;
+  decisionPending?: boolean;
+  onDecisionAction?: (job: RecommendedJobMatch, payload: JobDecisionPayload) => void;
+  onDecisionUpdate?: (
+    decision: JobApplicationDecisionResponse,
+    payload: JobDecisionPayload,
+  ) => void;
+}) {
   const salary = formatSalary(job);
   const applyUrl = applyUrlForJob(job);
   const attribution = sourceAttribution(job.job_url);
@@ -22,6 +44,18 @@ export function RecommendedJobCard({ job }: { job: RecommendedJobMatch }) {
   const remoteUnverified =
     job.remote_eligibility === "unknown" ||
     job.remote_eligibility === "remote_eligibility_unclear";
+  const [applyViewed, setApplyViewed] = useState(false);
+  const [notes, setNotes] = useState(decision?.notes ?? "");
+  const [nextAction, setNextAction] = useState(decision?.next_action ?? "");
+  const [priority, setPriority] = useState<JobDecisionPriority>(
+    decision?.priority ?? "medium",
+  );
+
+  useEffect(() => {
+    setNotes(decision?.notes ?? "");
+    setNextAction(decision?.next_action ?? "");
+    setPriority(decision?.priority ?? "medium");
+  }, [decision?.id, decision?.notes, decision?.next_action, decision?.priority]);
 
   return (
     <article
@@ -42,6 +76,11 @@ export function RecommendedJobCard({ job }: { job: RecommendedJobMatch }) {
             {job.is_stale ? <Badge tone="warning">Score may be stale</Badge> : null}
             {remoteUnverified ? (
               <Badge tone="warning">Remote status unverified</Badge>
+            ) : null}
+            {decision?.decision_status ? (
+              <Badge tone={decisionTone(decision.decision_status)}>
+                {decisionStatusLabel(decision.decision_status)}
+              </Badge>
             ) : null}
           </div>
 
@@ -74,6 +113,7 @@ export function RecommendedJobCard({ job }: { job: RecommendedJobMatch }) {
               href={applyUrl}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => setApplyViewed(true)}
               className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]"
             >
               Apply / View Job
@@ -87,8 +127,83 @@ export function RecommendedJobCard({ job }: { job: RecommendedJobMatch }) {
               Apply / View Job
             </button>
           )}
+          {applyViewed && onDecisionAction ? (
+            <button
+              type="button"
+              onClick={() =>
+                onDecisionAction(job, {
+                  decision_status: "applied",
+                  priority: decision?.priority ?? "high",
+                })
+              }
+              disabled={decisionPending}
+              className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Mark as applied
+            </button>
+          ) : null}
         </div>
       </div>
+
+      {onDecisionAction ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <DecisionButton
+            label="Save"
+            disabled={decisionPending}
+            onClick={() =>
+              onDecisionAction(job, {
+                decision_status: "saved",
+                priority: "medium",
+              })
+            }
+          />
+          <DecisionButton
+            label="Needs Resume"
+            disabled={decisionPending}
+            onClick={() =>
+              onDecisionAction(job, {
+                decision_status: "needs_custom_resume",
+                priority: "high",
+                next_action: "Tailor resume for this role.",
+              })
+            }
+          />
+          <DecisionButton
+            label="Needs Cold DM"
+            disabled={decisionPending}
+            onClick={() =>
+              onDecisionAction(job, {
+                decision_status: "needs_cold_dm",
+                priority: "high",
+                next_action:
+                  "Find founder or hiring manager and draft cold DM.",
+              })
+            }
+          />
+          <DecisionButton
+            label="Applied"
+            disabled={decisionPending}
+            onClick={() =>
+              onDecisionAction(job, {
+                decision_status: "applied",
+                priority: decision?.priority ?? "high",
+              })
+            }
+          />
+          <DecisionButton
+            label="Skip"
+            disabled={decisionPending}
+            onClick={() => onDecisionAction(job, { decision_status: "skipped" })}
+          />
+          <DecisionButton
+            label="Not Interested"
+            disabled={decisionPending}
+            onClick={() =>
+              onDecisionAction(job, { decision_status: "not_interested" })
+            }
+          />
+        </div>
+      ) : null}
 
       <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
         <Fact label="Remote" value={formatRemoteEligibility(job.remote_eligibility)} />
@@ -113,6 +228,65 @@ export function RecommendedJobCard({ job }: { job: RecommendedJobMatch }) {
         <SignalList title="Negative signals" items={job.negative_signals ?? []} />
       </div>
 
+      {decision ? (
+        <div className="mt-4 rounded border border-[#edf0f5] bg-[#fcfcfd] p-3">
+          <div className="grid gap-3 md:grid-cols-[1fr_1fr_160px_auto] md:items-end">
+            <label className="text-sm text-[#344054]">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-normal text-[#667085]">
+                Notes
+              </span>
+              <textarea
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                rows={2}
+                className="w-full rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="text-sm text-[#344054]">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-normal text-[#667085]">
+                Next action
+              </span>
+              <textarea
+                value={nextAction}
+                onChange={(event) => setNextAction(event.target.value)}
+                rows={2}
+                className="w-full rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="text-sm text-[#344054]">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-normal text-[#667085]">
+                Priority
+              </span>
+              <select
+                value={priority}
+                onChange={(event) => setPriority(event.target.value)}
+                className="w-full rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm"
+              >
+                {["low", "medium", "high", "urgent"].map((item) => (
+                  <option key={item} value={item}>
+                    {labelize(item)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() =>
+                onDecisionUpdate?.(decision, {
+                  notes,
+                  next_action: nextAction,
+                  priority,
+                })
+              }
+              disabled={decisionPending}
+              className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Save notes
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#edf0f5] pt-3 text-xs text-[#667085]">
         {attribution.url ? (
           <a
@@ -129,6 +303,27 @@ export function RecommendedJobCard({ job }: { job: RecommendedJobMatch }) {
         <span>Scored {formatDate(job.scored_at)}</span>
       </div>
     </article>
+  );
+}
+
+function DecisionButton({
+  label,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="rounded border border-[#c8ced8] bg-white px-3 py-1.5 text-sm font-medium text-[#344054] hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {label}
+    </button>
   );
 }
 
@@ -208,6 +403,43 @@ function eligibilityTone(value: string): "success" | "info" | "warning" | "dange
     return "warning";
   }
   if (value === "unsuitable") {
+    return "danger";
+  }
+  return "neutral";
+}
+
+export function decisionStatusLabel(value: JobDecisionStatus) {
+  return (
+    {
+      saved: "Saved",
+      interested: "Interested",
+      needs_custom_resume: "Needs Resume",
+      needs_cold_dm: "Needs Cold DM",
+      applied: "Applied",
+      skipped: "Skipped",
+      not_interested: "Not Interested",
+      interviewing: "Interviewing",
+      rejected: "Rejected",
+      offer: "Offer",
+      archived: "Archived",
+      dismissed: "Skipped",
+    }[value] ?? labelize(value)
+  );
+}
+
+function decisionTone(
+  value: JobDecisionStatus,
+): "success" | "info" | "warning" | "danger" | "neutral" {
+  if (value === "applied" || value === "interviewing" || value === "offer") {
+    return "success";
+  }
+  if (value === "saved" || value === "interested") {
+    return "info";
+  }
+  if (value === "needs_custom_resume" || value === "needs_cold_dm") {
+    return "warning";
+  }
+  if (value === "not_interested" || value === "rejected" || value === "dismissed") {
     return "danger";
   }
   return "neutral";
