@@ -9,6 +9,7 @@ from app.utils.enums import RemoteType
 if TYPE_CHECKING:
     from app.models.job_application_decision import JobApplicationDecision
     from app.models.job_matching_profile import JobMatchingProfile
+    from app.models.resume import Resume
 
 
 class UserProfile(Base, UUIDMixin, TimestampMixin):
@@ -45,6 +46,11 @@ class UserProfile(Base, UUIDMixin, TimestampMixin):
         uselist=False,
     )
     job_application_decisions: Mapped[list["JobApplicationDecision"]] = relationship(
+        back_populates="user_profile",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    resumes: Mapped[list["Resume"]] = relationship(
         back_populates="user_profile",
         cascade="all, delete-orphan",
         passive_deletes=True,

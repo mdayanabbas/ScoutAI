@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { ApplicationPacketPanel } from "@/components/applications/ApplicationPacketPanel";
 import { ApplicationPrepPanel } from "@/components/applications/ApplicationPrepPanel";
 import {
   applyUrlForJob,
@@ -20,6 +21,7 @@ import type {
   JobDecisionStatus,
 } from "@/types/job-decision";
 import type { ApplicationPrepResponse } from "@/types/application-prep";
+import type { ApplicationPacketResponse } from "@/types/application-packet";
 import type { RecommendedJobMatch } from "@/types/job-match";
 import { useEffect, useState } from "react";
 
@@ -33,6 +35,10 @@ export function RecommendedJobCard({
   prepPending = false,
   prepError,
   onPrepareApplication,
+  packet,
+  packetPending = false,
+  packetError,
+  onGeneratePacket,
 }: {
   job: RecommendedJobMatch;
   decision?: JobApplicationDecisionResponse | null;
@@ -46,6 +52,10 @@ export function RecommendedJobCard({
   prepPending?: boolean;
   prepError?: string | null;
   onPrepareApplication?: (job: RecommendedJobMatch) => void;
+  packet?: ApplicationPacketResponse | null;
+  packetPending?: boolean;
+  packetError?: string | null;
+  onGeneratePacket?: (job: RecommendedJobMatch) => void;
 }) {
   const salary = formatSalary(job);
   const applyUrl = applyUrlForJob(job);
@@ -160,6 +170,20 @@ export function RecommendedJobCard({
               className="rounded border border-[#175cd3] bg-white px-3 py-2 text-sm font-medium text-[#175cd3] hover:bg-[#eff6ff] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {prepPending ? "Preparing..." : prep ? "Regenerate Prep" : "Prepare Application"}
+            </button>
+          ) : null}
+          {onGeneratePacket ? (
+            <button
+              type="button"
+              onClick={() => onGeneratePacket(job)}
+              disabled={packetPending}
+              className="rounded border border-[#166534] bg-white px-3 py-2 text-sm font-medium text-[#166534] hover:bg-[#f0fdf4] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {packetPending
+                ? "Generating packet..."
+                : packet
+                  ? "Regenerate Packet"
+                  : "Generate Packet"}
             </button>
           ) : null}
         </div>
@@ -324,6 +348,30 @@ export function RecommendedJobCard({
       ) : null}
 
       {prep ? <ApplicationPrepPanel prep={prep} /> : null}
+
+      {!packet && !packetPending && !packetError && onGeneratePacket ? (
+        <p className="mt-4 rounded border border-[#edf0f5] bg-[#fcfcfd] px-3 py-2 text-sm text-[#667085]">
+          Generate a tailored packet before applying.
+        </p>
+      ) : null}
+
+      {packetError ? (
+        <div className="mt-4 rounded border border-[#fecaca] bg-[#fff7f7] p-3 text-sm text-[#991b1b]">
+          <div className="font-medium">Could not generate application packet.</div>
+          <p className="mt-1">{packetError}</p>
+          {onGeneratePacket ? (
+            <button
+              type="button"
+              onClick={() => onGeneratePacket(job)}
+              className="mt-3 rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white"
+            >
+              Retry
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {packet ? <ApplicationPacketPanel packet={packet} /> : null}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#edf0f5] pt-3 text-xs text-[#667085]">
         {attribution.url ? (

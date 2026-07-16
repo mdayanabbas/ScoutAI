@@ -25,6 +25,7 @@ from app.services.remotive_remote_job_discovery_service import (
 from app.services.remote_job_discovery_orchestrator_service import (
     RemoteJobDiscoveryOrchestratorService,
 )
+from app.services.resume_service import ResumeService
 from app.services.job_matching_service import JobMatchingService
 from app.services.job_matching_profile_service import JobMatchingProfileService
 from app.services.job_service import JobService
@@ -49,6 +50,7 @@ __all__ = [
     "WeWorkRemotelyDiscoveryService",
     "RemotiveRemoteJobDiscoveryService",
     "RemoteJobDiscoveryOrchestratorService",
+    "ResumeService",
     "JobMatchingService",
     "JobMatchingProfileService",
     "JobService",

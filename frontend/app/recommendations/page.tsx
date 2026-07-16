@@ -1,13 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/layout/PageHeader";
 import { RecommendedJobCard } from "@/components/recommendations/RecommendedJobCard";
 import { RecommendationFilters } from "@/components/recommendations/RecommendationFilters";
+import { generateApplicationPacketForJob } from "@/lib/application-packet-api";
 import { generateApplicationPrepForJob } from "@/lib/application-prep-api";
 import { useRecommendedJobMatches } from "@/hooks/use-job-matches";
+import { useActiveResume } from "@/hooks/use-resumes";
 import { runUnifiedRemoteDiscovery } from "@/lib/job-matches-api";
+import type { ApplicationPacketResponse } from "@/types/application-packet";
 import type { ApplicationPrepResponse } from "@/types/application-prep";
 import type { JobApplicationDecisionResponse } from "@/types/job-decision";
 import type {
@@ -28,7 +32,11 @@ export default function RecommendationsPage() {
   const [prepByJobId, setPrepByJobId] = useState<Record<string, ApplicationPrepResponse>>({});
   const [prepErrors, setPrepErrors] = useState<Record<string, string>>({});
   const [prepPendingJobId, setPrepPendingJobId] = useState<string | null>(null);
+  const [packetByJobId, setPacketByJobId] = useState<Record<string, ApplicationPacketResponse>>({});
+  const [packetErrors, setPacketErrors] = useState<Record<string, string>>({});
+  const [packetPendingJobId, setPacketPendingJobId] = useState<string | null>(null);
   const [decisionByJobId, setDecisionByJobId] = useState<Record<string, JobApplicationDecisionResponse>>({});
+  const activeResumeQuery = useActiveResume();
 
   const params = useMemo<RecommendedJobMatchParams>(
     () => ({
@@ -109,6 +117,53 @@ export default function RecommendationsPage() {
     }
   }
 
+  async function generatePacket(job: RecommendedJobMatch) {
+    setPacketPendingJobId(job.job_id);
+    setPacketErrors((current) => {
+      const next = { ...current };
+      delete next[job.job_id];
+      return next;
+    });
+
+    try {
+      const packet = await generateApplicationPacketForJob(job.job_id);
+      setPacketByJobId((current) => ({ ...current, [job.job_id]: packet }));
+      if (packet.decision_id) {
+        setDecisionByJobId((current) => ({
+          ...current,
+          [job.job_id]: {
+            ...(current[job.job_id] ?? {}),
+            id: packet.decision_id ?? "",
+            job_id: job.job_id,
+            decision_status:
+              job.match_tier === "best_match" || job.match_tier === "strong_match"
+                ? "needs_custom_resume"
+                : "saved",
+            status:
+              job.match_tier === "best_match" || job.match_tier === "strong_match"
+                ? "needs_custom_resume"
+                : "saved",
+            priority: job.match_tier === "best_match" ? "high" : "medium",
+            fit_summary: packet.application_positioning,
+            concerns: (packet.risks_to_verify ?? [])
+              .map((item) => item.value ?? "")
+              .filter(Boolean)
+              .join("\n"),
+            next_action: packet.suggested_apply_plan?.[0]?.value ?? null,
+          },
+        }));
+      }
+    } catch (error) {
+      setPacketErrors((current) => ({
+        ...current,
+        [job.job_id]:
+          error instanceof Error ? error.message : "Could not generate application packet.",
+      }));
+    } finally {
+      setPacketPendingJobId(null);
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -141,6 +196,11 @@ export default function RecommendationsPage() {
         best={stats.best}
         worthChecking={stats.worthChecking}
         stale={stats.stale}
+      />
+
+      <ResumeStatusBanner
+        activeResume={activeResumeQuery.data}
+        loading={activeResumeQuery.isLoading}
       />
 
       <RecommendationFilters
@@ -202,11 +262,69 @@ export default function RecommendationsPage() {
               prepPending={prepPendingJobId === job.job_id}
               prepError={prepErrors[job.job_id]}
               onPrepareApplication={prepareApplication}
+              packet={packetByJobId[job.job_id]}
+              packetPending={packetPendingJobId === job.job_id}
+              packetError={packetErrors[job.job_id]}
+              onGeneratePacket={generatePacket}
             />
           ))}
         </section>
       ) : null}
     </>
+  );
+}
+
+function ResumeStatusBanner({
+  activeResume,
+  loading,
+}: {
+  activeResume?: { original_filename?: string | null; parse_status?: string | null } | null;
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className="mb-5 rounded-md border border-[#d9dee8] bg-white p-4 text-sm text-[#667085]">
+        Checking resume status...
+      </div>
+    );
+  }
+  if (activeResume?.parse_status === "parsed") {
+    return (
+      <div className="mb-5 flex flex-col gap-2 rounded-md border border-[#bbf7d0] bg-[#f0fdf4] p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="text-sm font-semibold text-[#166534]">
+            Resume-aware packets enabled
+          </div>
+          <p className="mt-1 text-sm text-[#344054]">
+            Using {activeResume.original_filename ?? "your active resume"}.
+          </p>
+        </div>
+        <Link
+          href="/profile/resume"
+          className="rounded border border-[#166534] bg-white px-3 py-2 text-sm font-medium text-[#166534] hover:bg-[#f0fdf4]"
+        >
+          Manage Resume
+        </Link>
+      </div>
+    );
+  }
+  return (
+    <div className="mb-5 flex flex-col gap-2 rounded-md border border-[#fed7aa] bg-[#fff7ed] p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <div className="text-sm font-semibold text-[#9a3412]">
+          Upload a resume to make application packets more accurate.
+        </div>
+        <p className="mt-1 text-sm text-[#667085]">
+          Packets still work, but resume evidence makes suggestions sharper.
+        </p>
+      </div>
+      <Link
+        href="/profile/resume"
+        className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]"
+      >
+        Upload Resume
+      </Link>
+    </div>
   );
 }
 
