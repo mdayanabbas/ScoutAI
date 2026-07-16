@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { ApplicationPacketPanel } from "@/components/applications/ApplicationPacketPanel";
 import { ApplicationPrepPanel } from "@/components/applications/ApplicationPrepPanel";
+import { ResumeImprovementPanel } from "@/components/applications/ResumeImprovementPanel";
 import {
   applyUrlForJob,
   formatEligibility,
@@ -22,6 +23,7 @@ import type {
 } from "@/types/job-decision";
 import type { ApplicationPrepResponse } from "@/types/application-prep";
 import type { ApplicationPacketResponse } from "@/types/application-packet";
+import type { ResumeImprovementResponse } from "@/types/resume-improvement";
 import type { RecommendedJobMatch } from "@/types/job-match";
 import { useEffect, useState } from "react";
 
@@ -40,6 +42,10 @@ export function RecommendedJobCard({
   packetError,
   onGeneratePacket,
   activeResumeParsed = false,
+  improvement,
+  improvementPending = false,
+  improvementError,
+  onImproveResume,
 }: {
   job: RecommendedJobMatch;
   decision?: JobApplicationDecisionResponse | null;
@@ -58,6 +64,10 @@ export function RecommendedJobCard({
   packetError?: string | null;
   onGeneratePacket?: (job: RecommendedJobMatch) => void;
   activeResumeParsed?: boolean;
+  improvement?: ResumeImprovementResponse | null;
+  improvementPending?: boolean;
+  improvementError?: string | null;
+  onImproveResume?: (job: RecommendedJobMatch) => void;
 }) {
   const salary = formatSalary(job);
   const applyUrl = applyUrlForJob(job);
@@ -186,6 +196,20 @@ export function RecommendedJobCard({
                 : packet
                   ? "Regenerate Packet"
                   : "Generate Packet"}
+            </button>
+          ) : null}
+          {onImproveResume ? (
+            <button
+              type="button"
+              onClick={() => onImproveResume(job)}
+              disabled={improvementPending}
+              className="rounded border border-[#7c3aed] bg-white px-3 py-2 text-sm font-medium text-[#6d28d9] hover:bg-[#f5f3ff] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {improvementPending
+                ? "Generating resume suggestions..."
+                : improvement
+                  ? "Regenerate Resume Suggestions"
+                  : "Improve Resume"}
             </button>
           ) : null}
         </div>
@@ -389,6 +413,24 @@ export function RecommendedJobCard({
       ) : null}
 
       {packet ? <ApplicationPacketPanel packet={packet} /> : null}
+
+      {improvementError ? (
+        <div className="mt-4 rounded border border-[#fecaca] bg-[#fff7f7] p-3 text-sm text-[#991b1b]">
+          <div className="font-medium">Could not generate resume improvement suggestions.</div>
+          <p className="mt-1">{improvementError}</p>
+          {onImproveResume ? (
+            <button
+              type="button"
+              onClick={() => onImproveResume(job)}
+              className="mt-3 rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white"
+            >
+              Retry
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {improvement ? <ResumeImprovementPanel improvement={improvement} /> : null}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#edf0f5] pt-3 text-xs text-[#667085]">
         {attribution.url ? (

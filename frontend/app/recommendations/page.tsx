@@ -8,12 +8,14 @@ import { RecommendedJobCard } from "@/components/recommendations/RecommendedJobC
 import { RecommendationFilters } from "@/components/recommendations/RecommendationFilters";
 import { generateApplicationPacketForJob } from "@/lib/application-packet-api";
 import { generateApplicationPrepForJob } from "@/lib/application-prep-api";
+import { generateResumeImprovementForJob } from "@/lib/resume-improvements-api";
 import { useRecommendedJobMatches } from "@/hooks/use-job-matches";
 import { useActiveResume } from "@/hooks/use-resumes";
 import { runUnifiedRemoteDiscovery } from "@/lib/job-matches-api";
 import type { ApplicationPacketResponse } from "@/types/application-packet";
 import type { ApplicationPrepResponse } from "@/types/application-prep";
 import type { JobApplicationDecisionResponse } from "@/types/job-decision";
+import type { ResumeImprovementResponse } from "@/types/resume-improvement";
 import type {
   RecommendedJobMatch,
   RecommendedJobMatchParams,
@@ -35,6 +37,9 @@ export default function RecommendationsPage() {
   const [packetByJobId, setPacketByJobId] = useState<Record<string, ApplicationPacketResponse>>({});
   const [packetErrors, setPacketErrors] = useState<Record<string, string>>({});
   const [packetPendingJobId, setPacketPendingJobId] = useState<string | null>(null);
+  const [improvementByJobId, setImprovementByJobId] = useState<Record<string, ResumeImprovementResponse>>({});
+  const [improvementErrors, setImprovementErrors] = useState<Record<string, string>>({});
+  const [improvementPendingJobId, setImprovementPendingJobId] = useState<string | null>(null);
   const [decisionByJobId, setDecisionByJobId] = useState<Record<string, JobApplicationDecisionResponse>>({});
   const activeResumeQuery = useActiveResume();
 
@@ -164,6 +169,55 @@ export default function RecommendationsPage() {
     }
   }
 
+  async function improveResume(job: RecommendedJobMatch) {
+    setImprovementPendingJobId(job.job_id);
+    setImprovementErrors((current) => {
+      const next = { ...current };
+      delete next[job.job_id];
+      return next;
+    });
+
+    try {
+      const improvement = await generateResumeImprovementForJob(job.job_id);
+      setImprovementByJobId((current) => ({ ...current, [job.job_id]: improvement }));
+      if (improvement.decision_id) {
+        setDecisionByJobId((current) => ({
+          ...current,
+          [job.job_id]: {
+            ...(current[job.job_id] ?? {}),
+            id: improvement.decision_id ?? "",
+            job_id: job.job_id,
+            decision_status:
+              job.match_tier === "best_match" || job.match_tier === "strong_match"
+                ? "needs_custom_resume"
+                : "saved",
+            status:
+              job.match_tier === "best_match" || job.match_tier === "strong_match"
+                ? "needs_custom_resume"
+                : "saved",
+            priority: job.match_tier === "best_match" ? "high" : "medium",
+            fit_summary: improvement.improvement_summary,
+            concerns: (improvement.risks ?? [])
+              .map((item) => item.suggestion ?? "")
+              .filter(Boolean)
+              .join("\n"),
+            next_action: improvement.suggested_next_action,
+          },
+        }));
+      }
+    } catch (error) {
+      setImprovementErrors((current) => ({
+        ...current,
+        [job.job_id]:
+          error instanceof Error
+            ? error.message
+            : "Could not generate resume improvement suggestions.",
+      }));
+    } finally {
+      setImprovementPendingJobId(null);
+    }
+  }
+
   return (
     <>
       <PageHeader
@@ -267,6 +321,10 @@ export default function RecommendationsPage() {
               packetError={packetErrors[job.job_id]}
               onGeneratePacket={generatePacket}
               activeResumeParsed={activeResumeQuery.data?.parse_status === "parsed"}
+              improvement={improvementByJobId[job.job_id]}
+              improvementPending={improvementPendingJobId === job.job_id}
+              improvementError={improvementErrors[job.job_id]}
+              onImproveResume={improveResume}
             />
           ))}
         </section>

@@ -125,6 +125,9 @@ export default function ResumePage() {
           <p>Your resume is not sent to external job boards.</p>
           <p>ScoutAI does not auto-apply or contact companies for you.</p>
         </div>
+        <p className="mt-3 text-sm text-[#667085]">
+          After uploading your resume, open a recommended job and click Improve Resume to see job-specific resume edits.
+        </p>
       </section>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
