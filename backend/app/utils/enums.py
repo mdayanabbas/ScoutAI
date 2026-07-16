@@ -121,8 +121,16 @@ class JobStatus(StrEnum):
 
 
 class JobApplicationDecisionStatus(StrEnum):
+    SAVED = "saved"
     INTERESTED = "interested"
     APPLIED = "applied"
+    SKIPPED = "skipped"
+    NOT_INTERESTED = "not_interested"
+    NEEDS_CUSTOM_RESUME = "needs_custom_resume"
+    NEEDS_COLD_DM = "needs_cold_dm"
+    INTERVIEWING = "interviewing"
+    REJECTED = "rejected"
+    OFFER = "offer"
     DISMISSED = "dismissed"
     ARCHIVED = "archived"
 

@@ -2,6 +2,10 @@ def test_core_schemas_importable():
     from app.schemas import (
         AgentRunCreate,
         AgentStepCreate,
+        ApplicationPacketRequest,
+        ApplicationPacketResponse,
+        ApplicationPrepRequest,
+        ApplicationPrepResponse,
         CompanyCreate,
         CompanyPageCreate,
         CrawlRunCreate,
@@ -42,6 +46,10 @@ def test_core_schemas_importable():
         [
             AgentRunCreate,
             AgentStepCreate,
+            ApplicationPacketRequest,
+            ApplicationPacketResponse,
+            ApplicationPrepRequest,
+            ApplicationPrepResponse,
             CompanyCreate,
             CompanyPageCreate,
             CrawlRunCreate,

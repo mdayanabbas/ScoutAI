@@ -9,6 +9,17 @@ from app.schemas.agent import (
     AgentStepRead,
     AgentStepUpdate,
 )
+from app.schemas.application_prep import (
+    ApplicationPrepListItem,
+    ApplicationPrepRequest,
+    ApplicationPrepResponse,
+)
+from app.schemas.application_packet import (
+    ApplicationPacketItem,
+    ApplicationPacketRequest,
+    ApplicationPacketResponse,
+    ApplicationPacketSection,
+)
 from app.schemas.common import (
     ErrorBody,
     ErrorResponse,
@@ -162,6 +173,13 @@ __all__ = [
     "AgentStepCreate",
     "AgentStepRead",
     "AgentStepUpdate",
+    "ApplicationPrepListItem",
+    "ApplicationPrepRequest",
+    "ApplicationPrepResponse",
+    "ApplicationPacketItem",
+    "ApplicationPacketRequest",
+    "ApplicationPacketResponse",
+    "ApplicationPacketSection",
     "CompanyBase",
     "CompanyCreate",
     "CompanyListItem",

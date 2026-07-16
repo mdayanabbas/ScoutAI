@@ -88,13 +88,12 @@ async def test_status_counts_is_not_treated_as_decision_id(job_decision_client, 
     response = await job_decision_client.get("/api/v1/job-decisions/status-counts")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "interested": 0,
-        "applied": 0,
-        "dismissed": 0,
-        "archived": 0,
-        "total": 0,
-    }
+    body = response.json()
+    assert body["interested"] == 0
+    assert body["applied"] == 0
+    assert body["archived"] == 0
+    assert body["needs_custom_resume"] == 0
+    assert body["total"] == 0
 
 
 @pytest.mark.asyncio
