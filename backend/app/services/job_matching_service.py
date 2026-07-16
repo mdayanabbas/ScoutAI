@@ -188,12 +188,14 @@ class JobMatchingService:
         return _sort_matches(matches, order_by)[offset : offset + limit]
 
     def is_stale(self, match: JobMatch, profile: JobMatchingProfile | None = None) -> bool:
-        profile = profile or match.job_matching_profile
-        job = match.job
+        if match.scoring_version != SCORING_VERSION:
+            return True
+        profile = self.profile_repository.get_by_id((profile or match.job_matching_profile).id)
+        job = self.job_repository.get_by_id(match.job_id)
+        scored_at = _as_utc(match.scored_at)
         return bool(
-            match.scoring_version != SCORING_VERSION
-            or (job.updated_at and job.updated_at > match.scored_at)
-            or (profile.updated_at and profile.updated_at > match.scored_at)
+            (job and job.updated_at and _as_utc(job.updated_at) >= scored_at)
+            or (profile and profile.updated_at and _as_utc(profile.updated_at) >= scored_at)
         )
 
     def _jobs_to_score(self, job_ids: list[str] | None, limit: int | None) -> list[Job]:
@@ -522,3 +524,7 @@ def _sort_matches(matches: list[JobMatch], order_by: str) -> list[JobMatch]:
             -(item.job.published_at or item.job.created_at).timestamp(),
         ),
     )
+
+
+def _as_utc(value: datetime) -> datetime:
+    return value.astimezone(timezone.utc) if value.tzinfo else value.replace(tzinfo=timezone.utc)

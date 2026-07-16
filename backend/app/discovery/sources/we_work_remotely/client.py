@@ -61,6 +61,8 @@ class WeWorkRemotelyRSSClient:
                         continue
                     return WWRFeedResponse(False, feed, reason="wwr_provider_error")
                 try:
+                    if response.status_code == 304:
+                        return self._handle_response(feed, response)
                     if response.is_redirect:
                         location = response.headers.get("location")
                         redirected = str(response.url.join(location or ""))
