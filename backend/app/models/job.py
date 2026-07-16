@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from app.models.company import Company
     from app.models.discovery_candidate import DiscoveryCandidate
     from app.models.job_enrichment_attempt import JobEnrichmentAttempt
+    from app.models.job_application_decision import JobApplicationDecision
     from app.models.job_board_expansion_link import JobBoardExpansionLink
     from app.models.job_discovery_link import JobDiscoveryLink
     from app.models.job_match import JobMatch
@@ -127,6 +128,11 @@ class Job(Base, UUIDMixin, TimestampMixin):
     )
     agent_runs: Mapped[list["AgentRun"]] = relationship(back_populates="job")
     job_matches: Mapped[list["JobMatch"]] = relationship(
+        back_populates="job",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    application_decisions: Mapped[list["JobApplicationDecision"]] = relationship(
         back_populates="job",
         cascade="all, delete-orphan",
         passive_deletes=True,
