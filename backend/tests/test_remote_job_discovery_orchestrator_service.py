@@ -65,8 +65,24 @@ def _result(source: str, *, status="succeeded", reason=None, created=1, records=
         "jobs_updated": 5,
         "jobs_scored": 6,
         "jobs_failed": 7,
-        "accepted_jobs": [{"job_id": f"{source}-job", "title": "AI Engineer"}],
-        "rejected_samples": [{"source_item_id": f"{source}-reject", "rejection_reason": "rejected"}],
+        "accepted_jobs": [
+            {
+                "job_id": f"{source}-job",
+                "company_name": "Jobs Co",
+                "title": "AI Engineer",
+                "remote_eligibility": "work_from_anywhere",
+                "action": "created",
+                "attribution_label": "Remote Jobs",
+            }
+        ],
+        "rejected_samples": [
+            {
+                "source_item_id": f"{source}-reject",
+                "title": "Senior AI Engineer",
+                "company_name": "Jobs Co",
+                "rejection_reason": "rejected",
+            }
+        ],
         "started_at": now,
         "finished_at": now,
         "duration_ms": 1,
