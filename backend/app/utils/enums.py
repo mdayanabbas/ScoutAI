@@ -120,6 +120,13 @@ class JobStatus(StrEnum):
     UNKNOWN = "unknown"
 
 
+class JobApplicationDecisionStatus(StrEnum):
+    INTERESTED = "interested"
+    APPLIED = "applied"
+    DISMISSED = "dismissed"
+    ARCHIVED = "archived"
+
+
 class JobEnrichmentStatus(StrEnum):
     NOT_ENRICHED = "not_enriched"
     PENDING = "pending"

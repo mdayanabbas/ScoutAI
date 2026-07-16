@@ -79,6 +79,14 @@ from app.schemas.job import (
     JobRead,
     JobUpdate,
 )
+from app.schemas.job_application_decision import (
+    JobApplicationDecisionCreate,
+    JobApplicationDecisionListItemRead,
+    JobApplicationDecisionListRead,
+    JobApplicationDecisionRead,
+    JobApplicationDecisionStatusCountsRead,
+    JobApplicationDecisionUpdate,
+)
 from app.schemas.job_source import JobSourceDetectionRead
 from app.schemas.himalayas_discovery import (
     HimalayasAcceptedJobSummary,
@@ -191,6 +199,12 @@ __all__ = [
     "AshbyBoardExpansionCandidateRead",
     "AshbyBoardExpansionRead",
     "JobCreate",
+    "JobApplicationDecisionCreate",
+    "JobApplicationDecisionListItemRead",
+    "JobApplicationDecisionListRead",
+    "JobApplicationDecisionRead",
+    "JobApplicationDecisionStatusCountsRead",
+    "JobApplicationDecisionUpdate",
     "JobEnrichmentAttemptListRead",
     "JobEnrichmentAttemptRead",
     "JobEnrichmentRunRead",

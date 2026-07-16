@@ -11,6 +11,9 @@ from app.repositories.discovery_candidate_repository import DiscoveryCandidateRe
 from app.repositories.discovery_evidence_repository import DiscoveryEvidenceRepository
 from app.repositories.discovery_run_repository import DiscoveryRunRepository
 from app.repositories.job_repository import JobRepository
+from app.repositories.job_application_decision_repository import (
+    JobApplicationDecisionRepository,
+)
 from app.repositories.job_board_expansion_link_repository import (
     JobBoardExpansionLinkRepository,
 )
@@ -36,6 +39,7 @@ __all__ = [
     "DiscoveryEvidenceRepository",
     "DiscoveryRunRepository",
     "JobRepository",
+    "JobApplicationDecisionRepository",
     "JobBoardExpansionLinkRepository",
     "JobEnrichmentAttemptRepository",
     "JobMatchingProfileRepository",
