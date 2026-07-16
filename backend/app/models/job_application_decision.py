@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Index, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDMixin
@@ -23,9 +23,24 @@ class JobApplicationDecision(Base, UUIDMixin, TimestampMixin):
     job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), nullable=False)
     user_profile_id: Mapped[str] = mapped_column(ForeignKey("user_profiles.id", ondelete="CASCADE"), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="interested")
+    priority: Mapped[str | None] = mapped_column(String(16))
     notes: Mapped[str | None] = mapped_column(Text)
+    fit_summary: Mapped[str | None] = mapped_column(Text)
+    concerns: Mapped[list | None] = mapped_column(JSON)
+    next_action: Mapped[str | None] = mapped_column(Text)
+    next_action_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_snapshot: Mapped[dict | None] = mapped_column(JSON)
+    match_snapshot: Mapped[dict | None] = mapped_column(JSON)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    saved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    skipped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_status_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     job: Mapped["Job"] = relationship(back_populates="application_decisions")
     user_profile: Mapped["UserProfile"] = relationship(back_populates="job_application_decisions")
+
+    @property
+    def decision_status(self) -> str:
+        return self.status

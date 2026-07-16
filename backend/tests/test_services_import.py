@@ -1,6 +1,8 @@
 def test_services_importable():
     from app.services import (
         AgentRunService,
+        ApplicationPacketService,
+        ApplicationPrepService,
         CompanyPageService,
         CompanyService,
         CrawlRunService,
@@ -20,6 +22,8 @@ def test_services_importable():
     assert all(
         [
             AgentRunService,
+            ApplicationPacketService,
+            ApplicationPrepService,
             CompanyPageService,
             CompanyService,
             CrawlRunService,

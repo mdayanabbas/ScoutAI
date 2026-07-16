@@ -42,7 +42,7 @@ export async function listJobDecisions(params: JobDecisionListParams = {}) {
   });
   return {
     ...response,
-    items: (response.items ?? []).map(normalizeDecision),
+    items: (response.items ?? []).map((item) => normalizeDecision(item)),
   };
 }
 
