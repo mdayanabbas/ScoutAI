@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { ApplicationPrepPanel } from "@/components/applications/ApplicationPrepPanel";
 import {
   applyUrlForJob,
   formatEligibility,
@@ -18,6 +19,7 @@ import type {
   JobDecisionPriority,
   JobDecisionStatus,
 } from "@/types/job-decision";
+import type { ApplicationPrepResponse } from "@/types/application-prep";
 import type { RecommendedJobMatch } from "@/types/job-match";
 import { useEffect, useState } from "react";
 
@@ -27,6 +29,10 @@ export function RecommendedJobCard({
   decisionPending = false,
   onDecisionAction,
   onDecisionUpdate,
+  prep,
+  prepPending = false,
+  prepError,
+  onPrepareApplication,
 }: {
   job: RecommendedJobMatch;
   decision?: JobApplicationDecisionResponse | null;
@@ -36,6 +42,10 @@ export function RecommendedJobCard({
     decision: JobApplicationDecisionResponse,
     payload: JobDecisionPayload,
   ) => void;
+  prep?: ApplicationPrepResponse | null;
+  prepPending?: boolean;
+  prepError?: string | null;
+  onPrepareApplication?: (job: RecommendedJobMatch) => void;
 }) {
   const salary = formatSalary(job);
   const applyUrl = applyUrlForJob(job);
@@ -140,6 +150,16 @@ export function RecommendedJobCard({
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc] disabled:cursor-not-allowed disabled:opacity-60"
             >
               Mark as applied
+            </button>
+          ) : null}
+          {onPrepareApplication ? (
+            <button
+              type="button"
+              onClick={() => onPrepareApplication(job)}
+              disabled={prepPending}
+              className="rounded border border-[#175cd3] bg-white px-3 py-2 text-sm font-medium text-[#175cd3] hover:bg-[#eff6ff] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {prepPending ? "Preparing..." : prep ? "Regenerate Prep" : "Prepare Application"}
             </button>
           ) : null}
         </div>
@@ -286,6 +306,24 @@ export function RecommendedJobCard({
           </div>
         </div>
       ) : null}
+
+      {prepError ? (
+        <div className="mt-4 rounded border border-[#fecaca] bg-[#fff7f7] p-3 text-sm text-[#991b1b]">
+          <div className="font-medium">Could not prepare application notes.</div>
+          <p className="mt-1">{prepError}</p>
+          {onPrepareApplication ? (
+            <button
+              type="button"
+              onClick={() => onPrepareApplication(job)}
+              className="mt-3 rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white"
+            >
+              Retry
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {prep ? <ApplicationPrepPanel prep={prep} /> : null}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#edf0f5] pt-3 text-xs text-[#667085]">
         {attribution.url ? (
