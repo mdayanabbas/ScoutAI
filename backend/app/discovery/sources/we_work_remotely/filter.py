@@ -118,13 +118,13 @@ def _seniority(title: str, text: str) -> tuple[str | None, str]:
     title_key = (normalize_title(title) or "").lower()
     if _has(title_key, r"\b(senior|staff|principal|lead|manager|director|executive|head of|vp|vice president)\b"):
         return "senior", "senior"
-    if _has(title_key, r"\b(intern|internship|entry level|entry-level|junior|new grad|graduate|associate|engineer i)\b"):
+    if _has(title_key, r"\b(intern|internship|entry level|entry-level|new grad|graduate|associate|engineer i)\b"):
         return "entry_level", "entry"
     exp_min, _ = _experience(text)
     if exp_min is not None and exp_min >= 5:
         return "senior", "senior"
     if exp_min == 4:
-        return "mid_level", "senior"
+        return "mid_level", "experience"
     if exp_min == 3:
         return "mid_level", "stretch"
     return None, "open"
