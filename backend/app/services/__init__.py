@@ -10,6 +10,7 @@ from app.services.discovery_job_ingestion_service import DiscoveryJobIngestionSe
 from app.services.job_batch_enrichment_service import JobBatchEnrichmentService
 from app.services.ashby_board_expansion_service import AshbyBoardExpansionService
 from app.services.job_detail_enrichment_service import JobDetailEnrichmentService
+from app.services.job_application_decision_service import JobApplicationDecisionService
 from app.services.himalayas_remote_job_discovery_service import (
     HimalayasRemoteJobDiscoveryService,
 )
@@ -18,6 +19,9 @@ from app.services.we_work_remotely_discovery_service import (
 )
 from app.services.remotive_remote_job_discovery_service import (
     RemotiveRemoteJobDiscoveryService,
+)
+from app.services.remote_job_discovery_orchestrator_service import (
+    RemoteJobDiscoveryOrchestratorService,
 )
 from app.services.job_matching_service import JobMatchingService
 from app.services.job_matching_profile_service import JobMatchingProfileService
@@ -36,9 +40,11 @@ __all__ = [
     "JobBatchEnrichmentService",
     "AshbyBoardExpansionService",
     "JobDetailEnrichmentService",
+    "JobApplicationDecisionService",
     "HimalayasRemoteJobDiscoveryService",
     "WeWorkRemotelyDiscoveryService",
     "RemotiveRemoteJobDiscoveryService",
+    "RemoteJobDiscoveryOrchestratorService",
     "JobMatchingService",
     "JobMatchingProfileService",
     "JobService",

@@ -79,6 +79,14 @@ from app.schemas.job import (
     JobRead,
     JobUpdate,
 )
+from app.schemas.job_application_decision import (
+    JobApplicationDecisionCreate,
+    JobApplicationDecisionListItemRead,
+    JobApplicationDecisionListRead,
+    JobApplicationDecisionRead,
+    JobApplicationDecisionStatusCountsRead,
+    JobApplicationDecisionUpdate,
+)
 from app.schemas.job_source import JobSourceDetectionRead
 from app.schemas.himalayas_discovery import (
     HimalayasAcceptedJobSummary,
@@ -104,6 +112,16 @@ from app.schemas.remotive_discovery import (
     RemotiveQueryPlanRead,
     RemotiveQueryResult,
     RemotiveRejectedCandidateSummary,
+)
+from app.schemas.remote_discovery import (
+    HimalayasRemoteDiscoveryOptions,
+    RemotiveRemoteDiscoveryOptions,
+    RemoteDiscoverySourceResult,
+    RemoteJobDiscoveryOrchestratorResult,
+    RemoteJobDiscoveryPlanRead,
+    RemoteJobDiscoveryRunRequest,
+    RemoteRecommendationSummary,
+    WWRRemoteDiscoveryOptions,
 )
 from app.schemas.job_match import (
     JobMatchBatchItemRead,
@@ -181,6 +199,12 @@ __all__ = [
     "AshbyBoardExpansionCandidateRead",
     "AshbyBoardExpansionRead",
     "JobCreate",
+    "JobApplicationDecisionCreate",
+    "JobApplicationDecisionListItemRead",
+    "JobApplicationDecisionListRead",
+    "JobApplicationDecisionRead",
+    "JobApplicationDecisionStatusCountsRead",
+    "JobApplicationDecisionUpdate",
     "JobEnrichmentAttemptListRead",
     "JobEnrichmentAttemptRead",
     "JobEnrichmentRunRead",
@@ -206,6 +230,14 @@ __all__ = [
     "RemotiveQueryPlanRead",
     "RemotiveQueryResult",
     "RemotiveRejectedCandidateSummary",
+    "HimalayasRemoteDiscoveryOptions",
+    "RemotiveRemoteDiscoveryOptions",
+    "RemoteDiscoverySourceResult",
+    "RemoteJobDiscoveryOrchestratorResult",
+    "RemoteJobDiscoveryPlanRead",
+    "RemoteJobDiscoveryRunRequest",
+    "RemoteRecommendationSummary",
+    "WWRRemoteDiscoveryOptions",
     "JobMatchingProfileCreate",
     "JobMatchBatchItemRead",
     "JobMatchBatchRead",
