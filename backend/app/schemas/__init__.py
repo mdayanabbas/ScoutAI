@@ -105,6 +105,16 @@ from app.schemas.remotive_discovery import (
     RemotiveQueryResult,
     RemotiveRejectedCandidateSummary,
 )
+from app.schemas.remote_discovery import (
+    HimalayasRemoteDiscoveryOptions,
+    RemotiveRemoteDiscoveryOptions,
+    RemoteDiscoverySourceResult,
+    RemoteJobDiscoveryOrchestratorResult,
+    RemoteJobDiscoveryPlanRead,
+    RemoteJobDiscoveryRunRequest,
+    RemoteRecommendationSummary,
+    WWRRemoteDiscoveryOptions,
+)
 from app.schemas.job_match import (
     JobMatchBatchItemRead,
     JobMatchBatchRead,
@@ -206,6 +216,14 @@ __all__ = [
     "RemotiveQueryPlanRead",
     "RemotiveQueryResult",
     "RemotiveRejectedCandidateSummary",
+    "HimalayasRemoteDiscoveryOptions",
+    "RemotiveRemoteDiscoveryOptions",
+    "RemoteDiscoverySourceResult",
+    "RemoteJobDiscoveryOrchestratorResult",
+    "RemoteJobDiscoveryPlanRead",
+    "RemoteJobDiscoveryRunRequest",
+    "RemoteRecommendationSummary",
+    "WWRRemoteDiscoveryOptions",
     "JobMatchingProfileCreate",
     "JobMatchBatchItemRead",
     "JobMatchBatchRead",

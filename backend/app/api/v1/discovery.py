@@ -25,6 +25,11 @@ from app.schemas.remotive_discovery import (
     RemotiveDiscoveryResult,
     RemotiveQueryPlanRead,
 )
+from app.schemas.remote_discovery import (
+    RemoteJobDiscoveryOrchestratorResult,
+    RemoteJobDiscoveryPlanRead,
+    RemoteJobDiscoveryRunRequest,
+)
 from app.discovery.sources.hacker_news.schemas import (
     HackerNewsDiscoveryRequest,
     HackerNewsDiscoveryResponse,
@@ -38,6 +43,9 @@ from app.services.we_work_remotely_discovery_service import (
 )
 from app.services.remotive_remote_job_discovery_service import (
     RemotiveRemoteJobDiscoveryService,
+)
+from app.services.remote_job_discovery_orchestrator_service import (
+    RemoteJobDiscoveryOrchestratorService,
 )
 from app.utils.enums import DiscoveryRunStatus, DiscoverySource
 
@@ -58,6 +66,10 @@ def get_we_work_remotely_service(db: Session = Depends(get_db)) -> WeWorkRemotel
 
 def get_remotive_service(db: Session = Depends(get_db)) -> RemotiveRemoteJobDiscoveryService:
     return RemotiveRemoteJobDiscoveryService(db)
+
+
+def get_remote_discovery_orchestrator_service(db: Session = Depends(get_db)) -> RemoteJobDiscoveryOrchestratorService:
+    return RemoteJobDiscoveryOrchestratorService(db)
 
 
 @router.post(
@@ -185,6 +197,37 @@ async def run_remotive_job_discovery(
         max_requests=request.max_requests,
         limit_per_request=request.limit_per_request,
         score_after_ingestion=request.score_after_ingestion,
+    )
+
+
+@router.get(
+    "/remote-jobs/plan",
+    response_model=RemoteJobDiscoveryPlanRead,
+    summary="Preview unified remote-job discovery plan",
+)
+def preview_remote_job_discovery_plan(
+    service: RemoteJobDiscoveryOrchestratorService = Depends(get_remote_discovery_orchestrator_service),
+):
+    return service.plan_remote_discovery()
+
+
+@router.post(
+    "/remote-jobs/run",
+    response_model=RemoteJobDiscoveryOrchestratorResult,
+    summary="Run unified remote-job discovery",
+)
+async def run_remote_job_discovery(
+    data: RemoteJobDiscoveryRunRequest | None = None,
+    service: RemoteJobDiscoveryOrchestratorService = Depends(get_remote_discovery_orchestrator_service),
+):
+    request = data or RemoteJobDiscoveryRunRequest()
+    return await service.run_remote_discovery(
+        force=request.force,
+        sources=request.sources,
+        score_after_ingestion=request.score_after_ingestion,
+        himalayas_options=request.himalayas.model_dump(exclude_none=True) if request.himalayas else None,
+        we_work_remotely_options=request.we_work_remotely.model_dump(exclude_none=True) if request.we_work_remotely else None,
+        remotive_options=request.remotive.model_dump(exclude_none=True) if request.remotive else None,
     )
 
 
