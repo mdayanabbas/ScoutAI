@@ -93,9 +93,70 @@ export type DiscoveryRunSummary = {
   candidates_rejected?: number;
 };
 
-export type DiscoverySourceResult = {
-  source: "Himalayas" | "We Work Remotely" | "Remotive";
-  ok: boolean;
-  result?: DiscoveryRunSummary;
-  error?: string;
+export type RemoteDiscoverySourceResult = {
+  source: "himalayas" | "we_work_remotely" | "remotive" | string;
+  status?: string;
+  reason?: string | null;
+  discovery_run_id?: string | null;
+  started_at?: string;
+  finished_at?: string;
+  duration_ms?: number;
+  jobs_created?: number;
+  jobs_existing?: number;
+  jobs_updated?: number;
+  jobs_scored?: number;
+  jobs_failed?: number;
+  candidates_created?: number;
+  candidates_existing?: number;
+  candidates_rejected?: number;
+  provider_records_seen?: number;
+  unique_records?: number;
+  accepted_jobs_count?: number;
+  rejected_samples_count?: number;
+  accepted_jobs?: Array<Record<string, unknown>>;
+  rejected_samples?: Array<Record<string, unknown>>;
+  warnings?: string[];
+  error?: string | null;
+};
+
+export type RemoteDiscoveryRecommendationSummary = {
+  job_id: string;
+  company_name?: string | null;
+  title: string;
+  remote_eligibility: string;
+  match_tier: string;
+  eligibility_status: string;
+  total_score: number;
+  salary_min?: number | string | null;
+  salary_max?: number | string | null;
+  salary_currency?: string | null;
+  job_url?: string | null;
+  apply_url?: string | null;
+  eligibility_reason?: string | null;
+};
+
+export type RemoteJobDiscoveryOrchestratorResult = {
+  status: "succeeded" | "partial" | "failed" | "skipped" | string;
+  reason?: string | null;
+  profile_id?: string | null;
+  sources_planned?: string[];
+  sources_completed?: number;
+  sources_failed?: number;
+  sources_skipped?: number;
+  total_provider_records_seen?: number;
+  total_unique_records?: number;
+  total_candidates_created?: number;
+  total_candidates_existing?: number;
+  total_candidates_rejected?: number;
+  total_jobs_created?: number;
+  total_jobs_existing?: number;
+  total_jobs_updated?: number;
+  total_jobs_scored?: number;
+  total_jobs_failed?: number;
+  source_results?: RemoteDiscoverySourceResult[];
+  top_recommendations?: RemoteDiscoveryRecommendationSummary[];
+  started_at?: string;
+  finished_at?: string;
+  duration_ms?: number;
+  warnings?: string[];
 };
