@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { ApplicationPacketPanel } from "@/components/applications/ApplicationPacketPanel";
@@ -278,6 +279,12 @@ function TrackedJobCard({
               Apply / View Job
             </a>
           ) : null}
+          <Link
+            href={`/jobs/${decision.job_id}/workspace`}
+            className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
+          >
+            Open Workspace
+          </Link>
           <button
             type="button"
             onClick={onPrepare}
