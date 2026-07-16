@@ -102,7 +102,7 @@ class HimalayasJobPayload(BaseModel):
             data["timezoneRestrictions"] = data.get("timezoneRestriction")
         if "categories" not in data and "category" in data:
             data["categories"] = data.get("category")
-        if "salaryPeriod" not in data:
+        if not data.get("salaryPeriod"):
             data["salaryPeriod"] = "annual"
         pub = parse_himalayas_timestamp(data.get("pubDate"))
         data["pubDate"] = pub.value

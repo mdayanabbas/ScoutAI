@@ -35,7 +35,9 @@ class WeWorkRemotelyRSSParser:
             return WWRFeedParseResult(WWRFeedMetadata(), warnings=["wwr_invalid_xml"])
         if _too_deep(root):
             return WWRFeedParseResult(WWRFeedMetadata(), warnings=["wwr_xml_too_deep"])
-        channel = root.find("channel") or root
+        channel = root.find("channel")
+        if channel is None:
+            channel = root
         metadata = WWRFeedMetadata(
             title=_child_text(channel, "title"),
             link=_child_text(channel, "link"),

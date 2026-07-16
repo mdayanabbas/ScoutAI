@@ -261,9 +261,9 @@ def _salary(payload: HimalayasJobPayload) -> tuple[int | None, int | None, str |
     period = str(payload.salary_period or "annual").lower()
     parts = []
     if payload.minimum_salary is not None:
-        parts.append(str(payload.minimum_salary))
+        parts.append(_format_salary_number(payload.minimum_salary))
     if payload.maximum_salary is not None and payload.maximum_salary != payload.minimum_salary:
-        parts.append(str(payload.maximum_salary))
+        parts.append(_format_salary_number(payload.maximum_salary))
     salary_text = " - ".join(parts)
     if salary_text and payload.currency:
         salary_text = f"{payload.currency.upper()} {salary_text}"
@@ -272,6 +272,10 @@ def _salary(payload: HimalayasJobPayload) -> tuple[int | None, int | None, str |
     if period in {"year", "yearly", "annual", "annually", "per year"}:
         return payload.minimum_salary, payload.maximum_salary, salary_text or None
     return None, None, salary_text or None
+
+
+def _format_salary_number(value: float) -> str:
+    return str(int(value)) if float(value).is_integer() else str(value)
 
 
 def _restriction_dict(item: Any) -> dict[str, str | None]:
