@@ -15,6 +15,7 @@ def test_core_repositories_importable():
         JobEnrichmentAttemptRepository,
         JobMatchRepository,
         JobMatchingProfileRepository,
+        ResumeRepository,
         TechStackRepository,
         UserProfileRepository,
     )
@@ -36,6 +37,7 @@ def test_core_repositories_importable():
             JobEnrichmentAttemptRepository,
             JobMatchRepository,
             JobMatchingProfileRepository,
+            ResumeRepository,
             TechStackRepository,
             UserProfileRepository,
         ]

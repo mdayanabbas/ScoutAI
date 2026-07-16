@@ -14,6 +14,7 @@ from app.models.job_enrichment_attempt import JobEnrichmentAttempt
 from app.models.job_discovery_link import JobDiscoveryLink
 from app.models.job_match import JobMatch
 from app.models.job_matching_profile import JobMatchingProfile
+from app.models.resume import Resume
 from app.models.tech_stack_item import TechStackItem
 from app.models.user_profile import UserProfile
 
@@ -34,6 +35,7 @@ __all__ = [
     "JobDiscoveryLink",
     "JobMatch",
     "JobMatchingProfile",
+    "Resume",
     "TechStackItem",
     "UserProfile",
 ]

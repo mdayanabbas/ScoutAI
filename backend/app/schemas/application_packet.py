@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ApplicationPacketRequest(BaseModel):
@@ -34,6 +34,12 @@ class ApplicationPacketResponse(BaseModel):
     match_tier: str | None = None
     total_score: float | None = None
     remote_eligibility: str | None = None
+    resume_id: str | None = None
+    resume_used: bool = False
+    resume_match_summary: str | None = None
+    resume_strengths: list[ApplicationPacketItem] = Field(default_factory=list)
+    resume_gaps: list[ApplicationPacketItem] = Field(default_factory=list)
+    resume_bullet_sources: list[ApplicationPacketItem] = Field(default_factory=list)
     application_positioning: str
     resume_focus: list[ApplicationPacketItem]
     resume_bullet_suggestions: list[ApplicationPacketItem]
