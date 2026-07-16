@@ -3,6 +3,7 @@ import type {
   DiscoveryRunSummary,
   RecommendedJobMatchesResponse,
   RecommendedJobMatchParams,
+  RemoteJobDiscoveryOrchestratorResult,
 } from "@/types/job-match";
 
 const defaultRecommendationParams = {
@@ -19,6 +20,28 @@ export function fetchRecommendedJobMatches(
     ...defaultRecommendationParams,
     ...params,
   });
+}
+
+export function runUnifiedRemoteDiscovery() {
+  return api.post<RemoteJobDiscoveryOrchestratorResult>(
+    "/discovery/remote-jobs/run",
+    {
+      force: true,
+      score_after_ingestion: true,
+      himalayas: {
+        max_queries: 10,
+        max_pages_per_query: 2,
+      },
+      we_work_remotely: {
+        include_all_other: true,
+        max_items_per_feed: 150,
+      },
+      remotive: {
+        max_requests: 4,
+        limit_per_request: 200,
+      },
+    },
+  );
 }
 
 export function runHimalayasDiscovery() {
