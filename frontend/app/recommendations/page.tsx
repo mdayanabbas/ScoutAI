@@ -5,9 +5,13 @@ import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { RecommendedJobCard } from "@/components/recommendations/RecommendedJobCard";
 import { RecommendationFilters } from "@/components/recommendations/RecommendationFilters";
+import { generateApplicationPrepForJob } from "@/lib/application-prep-api";
 import { useRecommendedJobMatches } from "@/hooks/use-job-matches";
 import { runUnifiedRemoteDiscovery } from "@/lib/job-matches-api";
+import type { ApplicationPrepResponse } from "@/types/application-prep";
+import type { JobApplicationDecisionResponse } from "@/types/job-decision";
 import type {
+  RecommendedJobMatch,
   RecommendedJobMatchParams,
   RemoteDiscoverySourceResult,
   RemoteJobDiscoveryOrchestratorResult,
@@ -21,6 +25,10 @@ export default function RecommendationsPage() {
     useState<RemoteJobDiscoveryOrchestratorResult | null>(null);
   const [discoveryRunning, setDiscoveryRunning] = useState(false);
   const [discoveryMessage, setDiscoveryMessage] = useState<string | null>(null);
+  const [prepByJobId, setPrepByJobId] = useState<Record<string, ApplicationPrepResponse>>({});
+  const [prepErrors, setPrepErrors] = useState<Record<string, string>>({});
+  const [prepPendingJobId, setPrepPendingJobId] = useState<string | null>(null);
+  const [decisionByJobId, setDecisionByJobId] = useState<Record<string, JobApplicationDecisionResponse>>({});
 
   const params = useMemo<RecommendedJobMatchParams>(
     () => ({
@@ -55,6 +63,49 @@ export default function RecommendationsPage() {
     } finally {
       setDiscoveryRunning(false);
       setDiscoveryMessage(null);
+    }
+  }
+
+  async function prepareApplication(job: RecommendedJobMatch) {
+    setPrepPendingJobId(job.job_id);
+    setPrepErrors((current) => {
+      const next = { ...current };
+      delete next[job.job_id];
+      return next;
+    });
+
+    try {
+      const prep = await generateApplicationPrepForJob(job.job_id);
+      setPrepByJobId((current) => ({ ...current, [job.job_id]: prep }));
+      if (prep.decision_id) {
+        setDecisionByJobId((current) => ({
+          ...current,
+          [job.job_id]: {
+            id: prep.decision_id ?? "",
+            job_id: job.job_id,
+            decision_status:
+              job.match_tier === "best_match" || job.match_tier === "strong_match"
+                ? "needs_custom_resume"
+                : "saved",
+            status:
+              job.match_tier === "best_match" || job.match_tier === "strong_match"
+                ? "needs_custom_resume"
+                : "saved",
+            priority: job.match_tier === "best_match" ? "high" : "medium",
+            fit_summary: prep.fit_summary,
+            concerns: (prep.concerns ?? []).map((item) => item.value ?? "").filter(Boolean).join("\n"),
+            next_action: prep.suggested_next_action,
+          },
+        }));
+      }
+    } catch (error) {
+      setPrepErrors((current) => ({
+        ...current,
+        [job.job_id]:
+          error instanceof Error ? error.message : "Could not prepare application notes.",
+      }));
+    } finally {
+      setPrepPendingJobId(null);
     }
   }
 
@@ -143,7 +194,15 @@ export default function RecommendationsPage() {
             <p className="text-sm text-[#667085]">Updating recommendations...</p>
           ) : null}
           {jobs.map((job) => (
-            <RecommendedJobCard key={job.job_id} job={job} />
+            <RecommendedJobCard
+              key={job.job_id}
+              job={job}
+              decision={decisionByJobId[job.job_id]}
+              prep={prepByJobId[job.job_id]}
+              prepPending={prepPendingJobId === job.job_id}
+              prepError={prepErrors[job.job_id]}
+              onPrepareApplication={prepareApplication}
+            />
           ))}
         </section>
       ) : null}
