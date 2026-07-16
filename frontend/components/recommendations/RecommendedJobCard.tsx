@@ -39,6 +39,7 @@ export function RecommendedJobCard({
   packetPending = false,
   packetError,
   onGeneratePacket,
+  activeResumeParsed = false,
 }: {
   job: RecommendedJobMatch;
   decision?: JobApplicationDecisionResponse | null;
@@ -56,6 +57,7 @@ export function RecommendedJobCard({
   packetPending?: boolean;
   packetError?: string | null;
   onGeneratePacket?: (job: RecommendedJobMatch) => void;
+  activeResumeParsed?: boolean;
 }) {
   const salary = formatSalary(job);
   const applyUrl = applyUrlForJob(job);
@@ -271,6 +273,21 @@ export function RecommendedJobCard({
         <SignalList title="Missing information" items={job.missing_information ?? []} />
         <SignalList title="Negative signals" items={job.negative_signals ?? []} />
       </div>
+
+      {onGeneratePacket && !packet ? (
+        <div
+          className={[
+            "mt-4 rounded border px-3 py-2 text-sm",
+            activeResumeParsed
+              ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#166534]"
+              : "border-[#fed7aa] bg-[#fff7ed] text-[#9a3412]",
+          ].join(" ")}
+        >
+          {activeResumeParsed
+            ? "Resume-aware packets available."
+            : "Upload resume for better packet suggestions."}
+        </div>
+      ) : null}
 
       {decision ? (
         <div className="mt-4 rounded border border-[#edf0f5] bg-[#fcfcfd] p-3">

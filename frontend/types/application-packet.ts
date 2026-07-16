@@ -11,7 +11,10 @@ export type ApplicationPacketItem = {
   label?: string | null;
   value?: string | null;
   reason?: string | null;
+  severity?: string | null;
 };
+
+export type ApplicationPacketEvidenceItem = ApplicationPacketItem | string | Record<string, unknown>;
 
 export type ApplicationPacketSection = {
   title?: string | null;
@@ -30,9 +33,9 @@ export type ApplicationPacketResponse = {
   resume_id?: string | null;
   resume_used?: boolean;
   resume_match_summary?: string | null;
-  resume_strengths?: ApplicationPacketItem[] | null;
-  resume_gaps?: ApplicationPacketItem[] | null;
-  resume_bullet_sources?: ApplicationPacketItem[] | null;
+  resume_strengths?: ApplicationPacketEvidenceItem[] | null;
+  resume_gaps?: ApplicationPacketEvidenceItem[] | null;
+  resume_bullet_sources?: ApplicationPacketEvidenceItem[] | null;
   application_positioning?: string | null;
   resume_focus?: ApplicationPacketItem[] | null;
   resume_bullet_suggestions?: ApplicationPacketItem[] | null;

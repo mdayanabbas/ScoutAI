@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { ApplicationPacketPanel } from "@/components/applications/ApplicationPacketPanel";
 import { ApplicationPrepPanel } from "@/components/applications/ApplicationPrepPanel";
+import { ResumeGapAnalysis } from "@/components/applications/ResumeGapAnalysis";
 import { PageHeader } from "@/components/layout/PageHeader";
 import {
   decisionStatusLabel,
@@ -271,7 +272,7 @@ function TrackedJobCard({
 
       {!packet && !packetPending && !packetError ? (
         <p className="mt-4 rounded border border-[#edf0f5] bg-[#fcfcfd] px-3 py-2 text-sm text-[#667085]">
-          Generate a tailored packet before applying.
+          Generate packet to compare this job with your resume.
         </p>
       ) : null}
 
@@ -286,6 +287,19 @@ function TrackedJobCard({
           >
             Retry
           </button>
+        </div>
+      ) : null}
+
+      {packet?.resume_used ? (
+        <div className="mt-4">
+          <ResumeGapAnalysis
+            resumeUsed={packet.resume_used}
+            resumeMatchSummary={packet.resume_match_summary}
+            resumeStrengths={packet.resume_strengths}
+            resumeGaps={packet.resume_gaps}
+            resumeBulletSources={packet.resume_bullet_sources}
+            compact
+          />
         </div>
       ) : null}
 

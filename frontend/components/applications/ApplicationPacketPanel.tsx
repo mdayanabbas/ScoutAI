@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { ResumeGapAnalysis } from "@/components/applications/ResumeGapAnalysis";
 import {
   formatMatchTier,
   formatRemoteEligibility,
@@ -26,9 +27,6 @@ export function ApplicationPacketPanel({
   const coldDmItems = cleanItems(packet.cold_dm_outline?.items);
   const applyPlan = cleanItems(packet.suggested_apply_plan);
   const risks = cleanItems(packet.risks_to_verify);
-  const resumeStrengths = cleanItems(packet.resume_strengths);
-  const resumeGaps = cleanItems(packet.resume_gaps);
-  const resumeBulletSources = cleanItems(packet.resume_bullet_sources);
 
   async function copy(key: CopyKey, text: string) {
     if (!text.trim()) {
@@ -82,40 +80,13 @@ export function ApplicationPacketPanel({
         <p className="mt-3 text-xs font-medium text-[#166534]">{copyMessage}</p>
       ) : null}
 
-      {packet.resume_used ? (
-        <div className="mt-4 rounded border border-[#bbf7d0] bg-white p-3">
-          <h4 className="text-xs font-semibold uppercase tracking-normal text-[#166534]">
-            Resume Match
-          </h4>
-          <p className="mt-2 text-sm leading-6 text-[#344054]">
-            {packet.resume_match_summary ?? "Uploaded resume evidence was used for this packet."}
-          </p>
-        </div>
-      ) : (
-        <div className="mt-4 rounded border border-[#d9dee8] bg-white p-3 text-sm text-[#667085]">
-          No active resume was used. Upload a resume for more accurate packet suggestions.
-        </div>
-      )}
-
-      {resumeStrengths.length > 0 || resumeGaps.length > 0 ? (
-        <div className="mt-3 grid gap-3 lg:grid-cols-2">
-          <PacketList title="Resume Strengths" items={resumeStrengths} />
-          <PacketList
-            title="Resume Gaps"
-            items={resumeGaps}
-            emptyText="No resume gaps detected."
-            tone="warning"
-          />
-        </div>
-      ) : null}
-
-      {resumeBulletSources.length > 0 ? (
-        <PacketList
-          title="Resume-Supported Bullet Sources"
-          items={resumeBulletSources}
-          className="mt-3"
-        />
-      ) : null}
+      <ResumeGapAnalysis
+        resumeUsed={packet.resume_used}
+        resumeMatchSummary={packet.resume_match_summary}
+        resumeStrengths={packet.resume_strengths}
+        resumeGaps={packet.resume_gaps}
+        resumeBulletSources={packet.resume_bullet_sources}
+      />
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
         <PacketList title="Resume Focus" items={cleanItems(packet.resume_focus)} />
