@@ -115,6 +115,18 @@ export default function ResumePage() {
         </div>
       ) : null}
 
+      <section className="mb-5 rounded-md border border-[#d9dee8] bg-white p-4">
+        <h2 className="text-sm font-semibold text-[#171923]">
+          How ScoutAI Uses Your Resume
+        </h2>
+        <div className="mt-3 grid gap-2 text-sm text-[#475467] md:grid-cols-2">
+          <p>ScoutAI extracts skills, technologies, projects and experience in your backend.</p>
+          <p>The active resume improves application packets and gap analysis.</p>
+          <p>Your resume is not sent to external job boards.</p>
+          <p>ScoutAI does not auto-apply or contact companies for you.</p>
+        </div>
+      </section>
+
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-5">
           <ActiveResumeCard

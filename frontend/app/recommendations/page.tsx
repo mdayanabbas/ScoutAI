@@ -266,6 +266,7 @@ export default function RecommendationsPage() {
               packetPending={packetPendingJobId === job.job_id}
               packetError={packetErrors[job.job_id]}
               onGeneratePacket={generatePacket}
+              activeResumeParsed={activeResumeQuery.data?.parse_status === "parsed"}
             />
           ))}
         </section>
