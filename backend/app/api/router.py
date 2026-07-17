@@ -5,6 +5,7 @@ from app.api.v1.application_prep import router as application_prep_router
 from app.api.v1.application_packets import router as application_packets_router
 from app.api.v1.companies import router as companies_router
 from app.api.v1.company_pages import router as company_pages_router
+from app.api.v1.company_watchlist import router as company_watchlist_router
 from app.api.v1.company_enrichment import router as company_enrichment_router
 from app.api.v1.crawler_runs import router as crawler_runs_router
 from app.api.v1.dashboard import router as dashboard_router
@@ -26,6 +27,7 @@ api_router.include_router(application_prep_router)
 api_router.include_router(application_packets_router)
 api_router.include_router(companies_router)
 api_router.include_router(company_pages_router)
+api_router.include_router(company_watchlist_router)
 api_router.include_router(company_enrichment_router)
 api_router.include_router(crawler_runs_router)
 api_router.include_router(dashboard_router)

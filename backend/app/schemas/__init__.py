@@ -47,6 +47,16 @@ from app.schemas.company_enrichment import (
     ManualCompanyDomainInput,
     RunEnrichmentResult,
 )
+from app.schemas.company_watchlist import (
+    CompanyWatchlistCreate,
+    CompanyWatchlistFromJobRequest,
+    CompanyWatchlistJobRead,
+    CompanyWatchlistJobsResponse,
+    CompanyWatchlistListResponse,
+    CompanyWatchlistResponse,
+    CompanyWatchlistStatsResponse,
+    CompanyWatchlistUpdate,
+)
 from app.schemas.crawler import (
     CrawlRunCreate,
     CrawlRunListItem,
@@ -206,6 +216,14 @@ __all__ = [
     "CompanyUpdate",
     "CandidateEnrichmentResult",
     "CompanyEnrichmentAttemptRead",
+    "CompanyWatchlistCreate",
+    "CompanyWatchlistFromJobRequest",
+    "CompanyWatchlistJobRead",
+    "CompanyWatchlistJobsResponse",
+    "CompanyWatchlistListResponse",
+    "CompanyWatchlistResponse",
+    "CompanyWatchlistStatsResponse",
+    "CompanyWatchlistUpdate",
     "CrawlRunCreate",
     "CrawlRunListItem",
     "CrawlRunMarkFailedRequest",
