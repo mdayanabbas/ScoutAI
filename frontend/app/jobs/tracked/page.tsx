@@ -146,6 +146,14 @@ export default function TrackedJobsPage() {
       <PageHeader
         title="Tracked Jobs"
         description="Saved jobs, application status, prep notes, and next actions."
+        actions={
+          <Link
+            href="/jobs/pipeline"
+            className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]"
+          >
+            Application Pipeline
+          </Link>
+        }
       />
 
       <TrackedCountSummary counts={countsQuery.data} />
