@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { ApplicationPipelineAnalytics } from "@/components/applications/ApplicationPipelineAnalytics";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { decisionStatusLabel } from "@/components/recommendations/RecommendedJobCard";
 import {
@@ -13,6 +14,7 @@ import {
   sourceAttribution,
 } from "@/components/recommendations/recommendation-format";
 import { useJobDecisions, useJobDecisionStatusCounts } from "@/hooks/use-job-decisions";
+import { buildApplicationPipelineAnalytics } from "@/lib/application-pipeline-analytics";
 import { archiveJobDecision, updateJobDecision } from "@/lib/job-decisions-api";
 import type {
   JobDecisionListItem,
@@ -73,6 +75,8 @@ export default function ApplicationPipelinePage() {
   const [resumeNeededOnly, setResumeNeededOnly] = useState(false);
   const [appliedOnly, setAppliedOnly] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(true);
+  const [analyticsMode, setAnalyticsMode] = useState<"all" | "filtered">("all");
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const decisionsQuery = useJobDecisions({ limit: 100, include_archived: true });
@@ -111,7 +115,12 @@ export default function ApplicationPipelinePage() {
     ],
   );
   const grouped = useMemo(() => groupByStatus(visibleDecisions), [visibleDecisions]);
-  const summary = useMemo(() => summarize(decisions), [decisions]);
+  const allAnalytics = useMemo(() => buildApplicationPipelineAnalytics(decisions), [decisions]);
+  const filteredAnalytics = useMemo(
+    () => buildApplicationPipelineAnalytics(visibleDecisions),
+    [visibleDecisions],
+  );
+  const analytics = analyticsMode === "filtered" ? filteredAnalytics : allAnalytics;
 
   async function changeStatus(decision: JobDecisionListItem, decision_status: JobDecisionStatus) {
     setPendingId(decision.id);
@@ -156,6 +165,12 @@ export default function ApplicationPipelinePage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <Link
+              href="#pipeline-analytics"
+              className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
+            >
+              Pipeline Analytics
+            </Link>
+            <Link
               href="/jobs/tracked"
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
@@ -171,7 +186,27 @@ export default function ApplicationPipelinePage() {
         }
       />
 
-      <PipelineSummary summary={summary} counts={countsQuery.data} />
+      <AnalyticsControls
+        show={showAnalytics}
+        mode={analyticsMode}
+        onShowChange={setShowAnalytics}
+        onModeChange={setAnalyticsMode}
+      />
+
+      {decisionsQuery.error ? (
+        <div className="mb-5 rounded-md border border-[#fecaca] bg-[#fff7f7] p-4 text-sm text-[#991b1b]">
+          Analytics unavailable.
+        </div>
+      ) : showAnalytics ? (
+        <ApplicationPipelineAnalytics
+          analytics={analytics}
+          label={
+            analyticsMode === "filtered"
+              ? "Based on the current filtered board view."
+              : "Based on loaded tracked jobs."
+          }
+        />
+      ) : null}
 
       <PipelineFilters
         search={search}
@@ -274,31 +309,42 @@ export default function ApplicationPipelinePage() {
   );
 }
 
-function PipelineSummary({
-  summary,
-  counts,
+function AnalyticsControls({
+  show,
+  mode,
+  onShowChange,
+  onModeChange,
 }: {
-  summary: Record<string, number>;
-  counts?: Record<string, number | undefined>;
+  show: boolean;
+  mode: "all" | "filtered";
+  onShowChange: (value: boolean) => void;
+  onModeChange: (value: "all" | "filtered") => void;
 }) {
-  const cards = [
-    ["Total tracked", counts?.total ?? summary.total],
-    ["Needs resume", summary.needs_custom_resume],
-    ["Applied", summary.applied],
-    ["Interviewing", summary.interviewing],
-    ["Offers", summary.offer],
-  ];
   return (
-    <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-      {cards.map(([label, value]) => (
-        <div key={label} className="rounded-md border border-[#d9dee8] bg-white p-4">
-          <div className="text-xs font-medium uppercase tracking-normal text-[#667085]">
-            {label}
-          </div>
-          <div className="mt-2 text-2xl font-semibold text-[#171923]">{value}</div>
-        </div>
-      ))}
-    </section>
+    <div className="mb-4 flex flex-col gap-3 rounded-md border border-[#d9dee8] bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+      <button
+        type="button"
+        onClick={() => onShowChange(!show)}
+        className="w-fit rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
+      >
+        {show ? "Hide Analytics" : "Show Analytics"}
+      </button>
+      <div className="flex w-fit rounded border border-[#c8ced8] bg-[#f8fafc] p-1">
+        {(["all", "filtered"] as const).map((item) => (
+          <button
+            key={item}
+            type="button"
+            onClick={() => onModeChange(item)}
+            className={[
+              "rounded px-3 py-1.5 text-sm font-medium",
+              mode === item ? "bg-white text-[#171923] shadow-sm" : "text-[#667085]",
+            ].join(" ")}
+          >
+            {item === "all" ? "All Tracked" : "Current Filter"}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -707,24 +753,6 @@ function buildFilterOptions(decisions: JobDecisionListItem[]) {
 
 function unique(values: Array<string | null | undefined>) {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value)))).sort();
-}
-
-function summarize(decisions: JobDecisionListItem[]) {
-  return decisions.reduce<Record<string, number>>(
-    (acc, decision) => {
-      const status = statusOf(decision);
-      acc.total += 1;
-      acc[status] = (acc[status] ?? 0) + 1;
-      return acc;
-    },
-    {
-      total: 0,
-      needs_custom_resume: 0,
-      applied: 0,
-      interviewing: 0,
-      offer: 0,
-    },
-  );
 }
 
 function formatDate(value: string) {
