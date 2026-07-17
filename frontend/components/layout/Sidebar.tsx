@@ -8,6 +8,7 @@ const navigation = [
   { name: "Companies", href: "/companies", icon: "C" },
   { name: "Jobs", href: "/jobs", icon: "J" },
   { name: "Tracked Jobs", href: "/jobs/tracked", icon: "T" },
+  { name: "Pipeline", href: "/jobs/pipeline", icon: "B" },
   { name: "Recommendations", href: "/recommendations", icon: "R" },
   { name: "Outreach", href: "/outreach", icon: "O" },
   { name: "CRM", href: "/crm", icon: "M" },

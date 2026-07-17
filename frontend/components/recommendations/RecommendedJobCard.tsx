@@ -159,6 +159,12 @@ export function RecommendedJobCard({
               Apply / View Job
             </button>
           )}
+          <Link
+            href={`/jobs/${job.job_id}/workspace`}
+            className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
+          >
+            Open Workspace
+          </Link>
           {applyViewed && onDecisionAction ? (
             <button
               type="button"

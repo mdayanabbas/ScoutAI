@@ -225,6 +225,12 @@ export default function RecommendationsPage() {
         description="AI/ML/FDE/SWE roles matched to your remote-from-India profile."
         actions={
           <div className="flex flex-wrap gap-2">
+            <Link
+              href="/jobs/pipeline"
+              className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
+            >
+              Application Pipeline
+            </Link>
             <button
               type="button"
               onClick={() => recommendationsQuery.refetch()}
