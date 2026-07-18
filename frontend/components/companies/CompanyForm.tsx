@@ -59,9 +59,12 @@ const initialValues: CompanyFormValues = {
 };
 
 type FieldErrors = Partial<Record<keyof CompanyFormValues, string>>;
+type CompanyFormInitialValues = Partial<
+  Omit<CompanyCreateInput, "website_url"> & { website_url: string | null }
+>;
 
 type CompanyFormProps = {
-  initialValues?: Partial<CompanyCreateInput>;
+  initialValues?: CompanyFormInitialValues;
   mode?: "create" | "edit";
   isSubmitting?: boolean;
   submitError?: unknown;
@@ -368,7 +371,7 @@ export function CompanyForm({
   );
 }
 
-function toFormValues(values?: Partial<CompanyCreateInput>): CompanyFormValues {
+function toFormValues(values?: CompanyFormInitialValues): CompanyFormValues {
   return {
     name: values?.name ?? initialValues.name,
     website_url: values?.website_url ?? initialValues.website_url,

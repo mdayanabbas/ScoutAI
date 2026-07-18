@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { WatchCompanyButton } from "@/components/companies/WatchCompanyButton";
 import { ApplicationPacketPanel } from "@/components/applications/ApplicationPacketPanel";
 import { ApplicationPrepPanel } from "@/components/applications/ApplicationPrepPanel";
 import { ResumeGapAnalysis } from "@/components/applications/ResumeGapAnalysis";
@@ -147,12 +148,20 @@ export default function TrackedJobsPage() {
         title="Tracked Jobs"
         description="Saved jobs, application status, prep notes, and next actions."
         actions={
-          <Link
-            href="/jobs/pipeline"
-            className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]"
-          >
-            Application Pipeline
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/companies/watchlist"
+              className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
+            >
+              Company Watchlist
+            </Link>
+            <Link
+              href="/jobs/pipeline"
+              className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]"
+            >
+              Application Pipeline
+            </Link>
+          </div>
         }
       />
 
@@ -293,6 +302,15 @@ function TrackedJobCard({
           >
             Open Workspace
           </Link>
+          <WatchCompanyButton
+            jobId={decision.job_id}
+            payload={{
+              priority: decision.priority ?? "medium",
+              watch_status: "watching",
+              interest_reason: decision.title || decision.job_title ? `Tracked role: ${decision.title ?? decision.job_title}` : undefined,
+              remote_interest: decision.remote_eligibility === "work_from_anywhere" ? "remote_worldwide" : "unknown",
+            }}
+          />
           <button
             type="button"
             onClick={onPrepare}

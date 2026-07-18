@@ -32,14 +32,18 @@ export function CompanyOverview({ company }: { company: Company }) {
             <h2 className="text-xl font-semibold text-[#171923]">
               {company.name}
             </h2>
-            <a
-              href={company.website_url}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-1 inline-block text-sm font-medium text-[#175cd3] hover:underline"
-            >
-              {company.website_url}
-            </a>
+            {company.website_url ? (
+              <a
+                href={company.website_url}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 inline-block text-sm font-medium text-[#175cd3] hover:underline"
+              >
+                {company.website_url}
+              </a>
+            ) : (
+              <p className="mt-1 text-sm text-[#667085]">No website URL</p>
+            )}
           </div>
           <StatusBadge value={company.is_active ? "active" : "inactive"} />
         </div>

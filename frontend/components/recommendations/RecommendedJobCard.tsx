@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { WatchCompanyButton } from "@/components/companies/WatchCompanyButton";
 import { ApplicationPacketPanel } from "@/components/applications/ApplicationPacketPanel";
 import { ApplicationPrepPanel } from "@/components/applications/ApplicationPrepPanel";
 import { ResumeImprovementPanel } from "@/components/applications/ResumeImprovementPanel";
@@ -165,6 +166,17 @@ export function RecommendedJobCard({
           >
             Open Workspace
           </Link>
+          <WatchCompanyButton
+            jobId={job.job_id}
+            payload={{
+              priority: "medium",
+              watch_status: "watching",
+              interest_reason: `Interesting ${formatMatchTier(job.match_tier)} role: ${job.title}`,
+              target_roles: [job.title, job.role_category].filter(Boolean) as string[],
+              remote_interest: remoteInterestFromRecommendation(job.remote_eligibility),
+              junior_friendliness_signal: juniorSignalFromSeniority(job.seniority),
+            }}
+          />
           {applyViewed && onDecisionAction ? (
             <button
               type="button"
@@ -598,6 +610,18 @@ function decisionTone(
 
 function scoreLabel(value: number | null | undefined) {
   return value == null ? "Not scored" : String(Math.round(value));
+}
+
+function remoteInterestFromRecommendation(value: string | null | undefined) {
+  if (value === "work_from_anywhere") return "remote_worldwide";
+  if (value === "remote_india_eligible") return "remote_india";
+  if (value === "hybrid") return "hybrid_possible";
+  return "unknown";
+}
+
+function juniorSignalFromSeniority(value: string | null | undefined) {
+  if (!value) return "unknown";
+  return /intern|junior|entry|new_grad|graduate/i.test(value) ? "strong" : "unknown";
 }
 
 function formatDate(value: string | null | undefined) {
