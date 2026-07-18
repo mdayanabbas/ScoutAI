@@ -20,7 +20,7 @@ export type CompanySource =
 export type Company = {
   id: string;
   name: string;
-  website_url: string;
+  website_url: string | null;
   normalized_domain: string;
   description: string | null;
   country: string | null;

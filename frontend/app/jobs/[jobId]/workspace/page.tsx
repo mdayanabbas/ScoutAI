@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 
+import { WatchCompanyButton } from "@/components/companies/WatchCompanyButton";
 import { ApplicationPacketPanel } from "@/components/applications/ApplicationPacketPanel";
 import { ApplicationPrepPanel } from "@/components/applications/ApplicationPrepPanel";
 import { ResumeGapAnalysis } from "@/components/applications/ResumeGapAnalysis";
@@ -238,10 +239,22 @@ export default function JobWorkspacePage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <Link
+              href="/companies/watchlist"
+              className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
+            >
+              Company Watchlist
+            </Link>
+            <Link
               href="/jobs/pipeline"
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
               Application Pipeline
+            </Link>
+            <Link
+              href="/discovery/control-center"
+              className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
+            >
+              Discovery Control
             </Link>
             <button
               type="button"
@@ -342,6 +355,21 @@ export default function JobWorkspacePage() {
 
         <aside className="space-y-5">
           <DecisionControls decision={currentDecision} pending={decisionPending} onUpdate={ensureDecision} error={decisionError} />
+          <section className="rounded-md border border-[#d9dee8] bg-white p-4">
+            <h2 className="text-sm font-semibold text-[#171923]">Company</h2>
+            <p className="mt-1 text-sm text-[#667085]">{display.companyName ?? "Unknown company"}</p>
+            <div className="mt-3">
+              <WatchCompanyButton
+                jobId={jobId}
+                payload={{
+                  priority: currentDecision?.priority ?? "medium",
+                  watch_status: "watching",
+                  interest_reason: `Workspace role: ${display.title}`,
+                  target_roles: [display.title, display.roleCategory].filter(Boolean) as string[],
+                }}
+              />
+            </div>
+          </section>
           <ActiveResumeCard resume={activeResumeQuery.data} loading={activeResumeQuery.isLoading} />
           <Checklist checked={checked} onToggle={(item) => setChecked((current) => ({ ...current, [item]: !current[item] }))} />
           <NotesCard

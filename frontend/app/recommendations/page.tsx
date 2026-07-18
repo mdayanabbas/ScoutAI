@@ -226,10 +226,22 @@ export default function RecommendationsPage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <Link
+              href="/companies/watchlist"
+              className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
+            >
+              Company Watchlist
+            </Link>
+            <Link
               href="/jobs/pipeline"
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
               Application Pipeline
+            </Link>
+            <Link
+              href="/discovery/control-center"
+              className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
+            >
+              Discovery Control
             </Link>
             <button
               type="button"

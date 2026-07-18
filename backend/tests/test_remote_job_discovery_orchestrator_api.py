@@ -128,6 +128,9 @@ async def test_run_endpoint_succeeds_and_supports_selected_sources(app, remote_d
             "himalayas_options": None,
             "we_work_remotely_options": None,
             "remotive_options": {"max_requests": 2, "limit_per_request": 25},
+            "hacker_news_options": None,
+            "ycombinator_options": None,
+            "ashby_options": None,
         }
     ]
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { WatchCompanyButton } from "@/components/companies/WatchCompanyButton";
 import { ApplicationPipelineAnalytics } from "@/components/applications/ApplicationPipelineAnalytics";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { decisionStatusLabel } from "@/components/recommendations/RecommendedJobCard";
@@ -165,6 +166,12 @@ export default function ApplicationPipelinePage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <Link
+              href="/companies/watchlist"
+              className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
+            >
+              Company Watchlist
+            </Link>
+            <Link
               href="#pipeline-analytics"
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
@@ -175,6 +182,12 @@ export default function ApplicationPipelinePage() {
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
               Tracked Jobs
+            </Link>
+            <Link
+              href="/discovery/control-center"
+              className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
+            >
+              Discovery Control
             </Link>
             <Link
               href="/recommendations"
@@ -561,6 +574,15 @@ function PipelineJobCard({
             </option>
           ))}
         </select>
+        <WatchCompanyButton
+          jobId={decision.job_id}
+          payload={{
+            priority: decision.priority ?? "medium",
+            watch_status: "watching",
+            interest_reason: decision.title || decision.job_title ? `Pipeline role: ${decision.title ?? decision.job_title}` : undefined,
+          }}
+          className="rounded border border-[#0f766e] px-2 py-1.5 text-xs font-medium text-[#0f766e] hover:bg-[#f0fdfa] disabled:cursor-not-allowed disabled:opacity-50"
+        />
         <button
           type="button"
           disabled={pending}

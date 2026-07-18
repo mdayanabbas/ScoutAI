@@ -228,6 +228,9 @@ async def run_remote_job_discovery(
         himalayas_options=request.himalayas.model_dump(exclude_none=True) if request.himalayas else None,
         we_work_remotely_options=request.we_work_remotely.model_dump(exclude_none=True) if request.we_work_remotely else None,
         remotive_options=request.remotive.model_dump(exclude_none=True) if request.remotive else None,
+        hacker_news_options=request.hacker_news.model_dump(exclude_none=True) if request.hacker_news else None,
+        ycombinator_options=request.ycombinator.model_dump(exclude_none=True) if request.ycombinator else None,
+        ashby_options=request.ashby.model_dump(exclude_none=True) if request.ashby else None,
     )
 
 
