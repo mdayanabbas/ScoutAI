@@ -3,6 +3,7 @@ from app.services.application_packet_service import ApplicationPacketService
 from app.services.application_prep_service import ApplicationPrepService
 from app.services.company_page_service import CompanyPageService
 from app.services.company_service import CompanyService
+from app.services.company_watchlist_service import CompanyWatchlistService
 from app.services.company_domain_enrichment_service import (
     CompanyDomainEnrichmentService,
 )
@@ -39,6 +40,7 @@ __all__ = [
     "ApplicationPrepService",
     "CompanyPageService",
     "CompanyService",
+    "CompanyWatchlistService",
     "CompanyDomainEnrichmentService",
     "CrawlRunService",
     "DiscoveryService",

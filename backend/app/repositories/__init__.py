@@ -6,6 +6,7 @@ from app.repositories.company_enrichment_attempt_repository import (
     CompanyEnrichmentAttemptRepository,
 )
 from app.repositories.company_repository import CompanyRepository
+from app.repositories.company_watchlist_repository import CompanyWatchlistRepository
 from app.repositories.crawl_run_repository import CrawlRunRepository
 from app.repositories.discovery_candidate_repository import DiscoveryCandidateRepository
 from app.repositories.discovery_evidence_repository import DiscoveryEvidenceRepository
@@ -35,6 +36,7 @@ __all__ = [
     "CompanyPageRepository",
     "CompanyEnrichmentAttemptRepository",
     "CompanyRepository",
+    "CompanyWatchlistRepository",
     "CrawlRunRepository",
     "DiscoveryCandidateRepository",
     "DiscoveryEvidenceRepository",

@@ -3,6 +3,7 @@ from app.models.agent_step import AgentStep
 from app.models.company import Company
 from app.models.company_enrichment_attempt import CompanyEnrichmentAttempt
 from app.models.company_page import CompanyPage
+from app.models.company_watchlist import CompanyWatchlistItem
 from app.models.crawl_run import CrawlRun
 from app.models.discovery_candidate import DiscoveryCandidate
 from app.models.discovery_evidence import DiscoveryEvidence
@@ -24,6 +25,7 @@ __all__ = [
     "Company",
     "CompanyEnrichmentAttempt",
     "CompanyPage",
+    "CompanyWatchlistItem",
     "CrawlRun",
     "DiscoveryCandidate",
     "DiscoveryEvidence",
