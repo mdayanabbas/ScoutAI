@@ -9,6 +9,7 @@ import {
   DailyScoutPanel,
   PayloadPreviewDrawer,
 } from "@/components/discovery/DailyScoutPanel";
+import { DailyScoutReviewQueue } from "@/components/discovery/DailyScoutReviewQueue";
 import { DailyScoutRunResult } from "@/components/discovery/DailyScoutRunResult";
 import {
   DiscoveryRunPresets,
@@ -31,6 +32,23 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { buildSourceEffectivenessSummary } from "@/lib/discovery-effectiveness";
 import { mergeDiscoveryRunDetail } from "@/lib/discovery-run-normalization";
 import {
+  buildDailyScoutReviewQueue,
+  getDailyScoutReviewState,
+  reviewStatusFromDecisionStatus,
+  upsertDailyScoutReviewState,
+  type DailyScoutReviewItem,
+  type DailyScoutReviewState,
+  type DailyScoutReviewStatus,
+} from "@/lib/daily-scout-review-queue";
+import {
+  cacheEntryToReviewFields,
+  deriveResumeFitFromPacket,
+  getResumeFitCache,
+  upsertResumeFitCache,
+  type ResumeFitCacheEntry,
+  type ResumeFitResult,
+} from "@/lib/resume-aware-review-ranking";
+import {
   discoveryPresetStorage,
   getAllPresets,
   materializePresetPayload,
@@ -40,12 +58,19 @@ import {
 } from "@/lib/discovery-presets";
 import { buildDailyScoutPayload, safeDefaultDailySources } from "@/lib/daily-scout";
 import { buildSourceQualityAdvisor } from "@/lib/source-quality-advisor";
+import { watchCompanyFromJob } from "@/lib/company-watchlist-api";
 import {
   fetchDiscoveryRun,
   fetchDiscoveryRuns,
   fetchRemoteDiscoveryPlan,
   runRemoteJobDiscovery,
 } from "@/lib/discovery-api";
+import { listJobDecisions, saveJobDecision, updateJobDecision } from "@/lib/job-decisions-api";
+import { fetchRecommendedJobMatches } from "@/lib/job-matches-api";
+import { fetchCompanyWatchlist } from "@/lib/company-watchlist-api";
+import { fetchActiveResume } from "@/lib/resumes-api";
+import { generateApplicationPacketForJob } from "@/lib/application-packet-api";
+import { generateResumeImprovementForJob } from "@/lib/resume-improvements-api";
 import type {
   DiscoveryRunListItem,
   DiscoverySource,
@@ -53,6 +78,7 @@ import type {
   RemoteJobDiscoveryOrchestratorResult,
   RemoteJobDiscoveryRunRequest,
 } from "@/types/discovery";
+import type { JobApplicationDecisionResponse, JobDecisionStatus } from "@/types/job-decision";
 
 type DiscoveryRunDetailRow = DiscoveryRunListItem | RemoteDiscoverySourceResult;
 
@@ -130,6 +156,17 @@ export default function DiscoveryControlCenterPage() {
   const [presets, setPresets] = useState<DiscoveryRunPreset[]>([]);
   const [presetMessage, setPresetMessage] = useState<string | null>(null);
   const [presetSessionRuns, setPresetSessionRuns] = useState<PresetRunSessionItem[]>([]);
+  const [reviewState, setReviewState] = useState<DailyScoutReviewState[]>([]);
+  const [decisionOverrides, setDecisionOverrides] = useState<Record<string, JobApplicationDecisionResponse>>({});
+  const [watchOverrides, setWatchOverrides] = useState<Record<string, string>>({});
+  const [includeSkippedReviewItems, setIncludeSkippedReviewItems] = useState(false);
+  const [reviewMessage, setReviewMessage] = useState<string | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [resumeFitCache, setResumeFitCache] = useState<ResumeFitCacheEntry[]>([]);
+  const [resumeFitOverrides, setResumeFitOverrides] = useState<Record<string, ResumeFitResult>>({});
+  const [resumeRankLoading, setResumeRankLoading] = useState(false);
+  const [resumeRankMessage, setResumeRankMessage] = useState<string | null>(null);
+  const [resumeRankError, setResumeRankError] = useState<string | null>(null);
 
   const planQuery = useQuery({
     queryKey: ["remote-discovery-plan"],
@@ -140,6 +177,30 @@ export default function DiscoveryControlCenterPage() {
     queryKey: ["discovery-runs", "recent"],
     queryFn: () => fetchDiscoveryRuns({ limit: 25 }),
     retry: 1,
+  });
+  const decisionsQuery = useQuery({
+    queryKey: ["job-decisions", "daily-scout-review"],
+    queryFn: () => listJobDecisions({ limit: 100, include_archived: true }),
+    retry: 1,
+    enabled: Boolean(dailyResult),
+  });
+  const watchlistQuery = useQuery({
+    queryKey: ["company-watchlist", "daily-scout-review"],
+    queryFn: () => fetchCompanyWatchlist({ limit: 100 }),
+    retry: 1,
+    enabled: Boolean(dailyResult),
+  });
+  const fallbackMatchesQuery = useQuery({
+    queryKey: ["job-matches", "daily-scout-review-fallback"],
+    queryFn: () => fetchRecommendedJobMatches({ order_by: "recommended", limit: 100 }),
+    retry: 1,
+    enabled: Boolean(dailyResult && !(dailyResult.top_recommendations ?? []).length),
+  });
+  const activeResumeQuery = useQuery({
+    queryKey: ["active-resume", "daily-scout-review"],
+    queryFn: fetchActiveResume,
+    retry: 1,
+    enabled: Boolean(dailyResult),
   });
 
   useEffect(() => {
@@ -155,7 +216,18 @@ export default function DiscoveryControlCenterPage() {
 
   useEffect(() => {
     setPresets(getAllPresets());
+    setReviewState(getDailyScoutReviewState());
+    setResumeFitCache(getResumeFitCache());
   }, []);
+
+  useEffect(() => {
+    if (!dailyResult) return;
+    if (window.location.hash === "#review-queue" || window.location.search.includes("tab=review")) {
+      window.setTimeout(() => {
+        document.getElementById("review-queue")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    }
+  }, [dailyResult]);
 
   const availableSources = useMemo(
     () =>
@@ -359,6 +431,199 @@ export default function DiscoveryControlCenterPage() {
     setPresetMessage("Preset deleted.");
   }
 
+  async function applyReviewDecision(
+    item: DailyScoutReviewItem,
+    status: JobDecisionStatus,
+    reviewStatus: DailyScoutReviewStatus,
+  ) {
+    if (!item.job_id) {
+      setReviewError("This queue item is missing a job ID.");
+      return;
+    }
+    setReviewError(null);
+    setReviewMessage(null);
+    try {
+      const response = item.decision_id
+        ? await updateJobDecision(item.decision_id, { decision_status: status, priority: "medium" })
+        : await saveJobDecision(item.job_id, { decision_status: status, priority: "medium" });
+      setDecisionOverrides((current) => ({ ...current, [item.job_id]: response }));
+      setReviewState((current) => upsertDailyScoutReviewState(current, item.job_id, reviewStatusFromDecisionStatus(status)));
+      setReviewMessage(`${item.title} marked as ${statusLabel(status)}.`);
+      await decisionsQuery.refetch();
+    } catch (err) {
+      setReviewError(friendlyError(err));
+    }
+  }
+
+  async function watchCompany(item: DailyScoutReviewItem) {
+    if (!item.job_id) {
+      setReviewError("This queue item is missing a job ID.");
+      return;
+    }
+    setReviewError(null);
+    setReviewMessage(null);
+    try {
+      await watchCompanyFromJob(item.job_id, {
+        priority: "medium",
+        watch_status: "watching",
+        interest_reason: `Daily Scout found ${item.title}${item.company_name ? ` at ${item.company_name}` : ""}.`,
+        target_roles: item.title ? [item.title] : [],
+        tags: ["daily-scout"],
+        remote_interest: remoteInterest(item.remote_eligibility),
+        junior_friendliness_signal: juniorSignal(item.title, item.eligibility_reason),
+      });
+      setWatchOverrides((current) => ({ ...current, [item.job_id]: "watching" }));
+      setReviewState((current) => upsertDailyScoutReviewState(current, item.job_id, "watched_company"));
+      setReviewMessage(item.company_name ? `${item.company_name} added to watchlist.` : "Company added to watchlist.");
+      await watchlistQuery.refetch();
+    } catch (err) {
+      const message = friendlyError(err);
+      if (message.toLowerCase().includes("already") || message.toLowerCase().includes("duplicate")) {
+        setWatchOverrides((current) => ({ ...current, [item.job_id]: "watching" }));
+        setReviewMessage("Company is already on your watchlist.");
+        return;
+      }
+      setReviewError(message);
+    }
+  }
+
+  function markOpenedWorkspace(item: DailyScoutReviewItem) {
+    setReviewState((current) => upsertDailyScoutReviewState(current, item.job_id, "opened_workspace"));
+  }
+
+  async function copyJobUrl(item: DailyScoutReviewItem) {
+    const url = item.apply_url ?? item.job_url;
+    if (!url) {
+      setReviewError("This job does not include a job URL.");
+      return;
+    }
+    setReviewError(null);
+    try {
+      await navigator.clipboard.writeText(url);
+      setReviewMessage("Job URL copied.");
+    } catch {
+      setReviewError("Could not copy job URL. You can open the job and copy it manually.");
+    }
+  }
+
+  async function bulkReviewDecision(
+    items: DailyScoutReviewItem[],
+    status: JobDecisionStatus,
+    reviewStatus: DailyScoutReviewStatus,
+  ) {
+    for (const item of items) {
+      await applyReviewDecision(item, status, reviewStatus);
+    }
+  }
+
+  async function rankItemsWithResume(items: DailyScoutReviewItem[], limit = 10) {
+    if (resumeRankLoading) return;
+    setResumeRankError(null);
+    setResumeRankMessage(null);
+
+    const activeResume = activeResumeQuery.data ?? await activeResumeQuery.refetch().then((response) => response.data ?? null);
+    if (!activeResume) {
+      setResumeRankMessage("No active resume found. Upload or activate a resume to rank jobs by resume fit.");
+      return;
+    }
+    if (activeResume.parse_status === "failed") {
+      setResumeRankError("Active resume parsing failed. Reparse or upload another resume before ranking.");
+      return;
+    }
+
+    const targetItems = items
+      .filter((item) => item.job_id)
+      .filter((item) => !resumeFitOverrides[item.job_id])
+      .slice(0, limit);
+    if (!targetItems.length) {
+      setResumeRankMessage("Visible jobs already have resume ranking for this session.");
+      return;
+    }
+
+    setResumeRankLoading(true);
+    let analyzed = 0;
+    let failed = 0;
+    let cache = resumeFitCache;
+
+    for (const item of targetItems) {
+      const cached = cache.find((entry) => entry.job_id === item.job_id && entry.resume_id === activeResume.id);
+      if (cached) {
+        setResumeFitOverrides((current) => ({ ...current, [item.job_id]: cacheEntryToReviewFields(cached) }));
+        analyzed += 1;
+        continue;
+      }
+
+      setResumeFitOverrides((current) => ({
+        ...current,
+        [item.job_id]: {
+          resume_fit_score: null,
+          resume_fit_tier: "unknown",
+          resume_fit_summary: null,
+          resume_strengths: [],
+          resume_gaps: [],
+          resume_bullet_sources: [],
+          resume_action: "needs_review",
+          resume_analysis_status: "loading",
+        },
+      }));
+
+      try {
+        const packet = await generateApplicationPacketForJob(item.job_id, {
+          update_decision: false,
+          include_resume_bullets: true,
+          include_cover_note_outline: false,
+          include_cold_dm_outline: false,
+          include_checklist: true,
+          include_risk_review: true,
+        });
+        let improvement = null;
+        try {
+          improvement = await generateResumeImprovementForJob(item.job_id, {
+            update_decision: false,
+            include_section_suggestions: true,
+            include_bullet_suggestions: true,
+            include_skill_gap_suggestions: true,
+            include_project_reordering: true,
+            include_remote_fit_suggestions: true,
+          });
+        } catch {
+          improvement = null;
+        }
+        const fit = deriveResumeFitFromPacket(packet, improvement, item);
+        setResumeFitOverrides((current) => ({ ...current, [item.job_id]: fit }));
+        cache = upsertResumeFitCache(cache, item.job_id, activeResume.id, fit);
+        setResumeFitCache(cache);
+        analyzed += 1;
+      } catch (err) {
+        failed += 1;
+        setResumeFitOverrides((current) => ({
+          ...current,
+          [item.job_id]: {
+            resume_fit_score: null,
+            resume_fit_tier: "unknown",
+            resume_fit_summary: null,
+            resume_strengths: [],
+            resume_gaps: [],
+            resume_bullet_sources: [],
+            resume_action: "needs_review",
+            resume_analysis_status: "failed",
+            resume_analysis_error: friendlyError(err),
+          },
+        }));
+      }
+    }
+
+    setResumeRankLoading(false);
+    setResumeRankMessage(`${analyzed} of ${targetItems.length} jobs analyzed.${failed ? ` ${failed} failed.` : ""}`);
+  }
+
+  function analyzeAllVisible(items: DailyScoutReviewItem[]) {
+    if (items.length > 20 && !window.confirm(`Analyze ${items.length} visible jobs with your resume? This can take a while.`)) {
+      return;
+    }
+    void rankItemsWithResume(items, items.length);
+  }
+
   const topRecommendations = result?.top_recommendations ?? [];
   const sourceResults = result?.source_results ?? [];
   const recentRuns = runsQuery.data?.items ?? [];
@@ -382,6 +647,25 @@ export default function DiscoveryControlCenterPage() {
     availableSources,
     includeWeeklyManualSources,
   });
+  const reviewQueue = buildDailyScoutReviewQueue(
+    dailyResult,
+    [
+      ...(decisionsQuery.data?.items ?? []),
+      ...Object.values(decisionOverrides),
+    ],
+    watchlistQuery.data?.items ?? [],
+    fallbackMatchesQuery.data?.items ?? [],
+    reviewState,
+    includeSkippedReviewItems,
+  ).map((item) => ({
+    ...item,
+    ...(resumeFitOverrides[item.job_id] ?? {}),
+    company_watch_status: watchOverrides[item.job_id] ?? item.company_watch_status,
+    review_status:
+      watchOverrides[item.job_id] && item.review_status === "unreviewed"
+        ? "watched_company"
+        : item.review_status,
+  }));
   const selectedRunSources = result?.recommendation_source_filter ?? selectedSources;
   const sourceScoped = Boolean(
     result?.recommendation_scope === "run_jobs" ||
@@ -522,6 +806,40 @@ export default function DiscoveryControlCenterPage() {
                 result={dailyResult}
                 recentRunsCount={recentRuns.length}
                 onOpenSourceDetails={openRunDetails}
+              />
+              <DailyScoutReviewQueue
+                items={reviewQueue}
+                loading={decisionsQuery.isLoading || watchlistQuery.isLoading || fallbackMatchesQuery.isLoading}
+                message={reviewMessage}
+                error={reviewError}
+                includeSkipped={includeSkippedReviewItems}
+                onIncludeSkippedChange={setIncludeSkippedReviewItems}
+                onDecisionAction={(item, status, reviewStatus) =>
+                  void applyReviewDecision(item, status, reviewStatus)
+                }
+                onWatchCompany={(item) => void watchCompany(item)}
+                onOpenedWorkspace={markOpenedWorkspace}
+                onCopyJobUrl={(item) => void copyJobUrl(item)}
+                onBulkDecisionAction={(items, status, reviewStatus) =>
+                  void bulkReviewDecision(items, status, reviewStatus)
+                }
+                onRunDailyScoutAgain={() => void runDailyScout()}
+                onTryRemoteJobsPreset={() => {
+                  const preset = presets.find((item) => item.id === "remote-jobs-only");
+                  if (preset) void runPreset(preset);
+                }}
+                onTryHnPreset={() => {
+                  const preset = presets.find((item) => item.id === "hn-startup-signals");
+                  if (preset) void runPreset(preset);
+                }}
+                activeResume={activeResumeQuery.data}
+                activeResumeLoading={activeResumeQuery.isLoading}
+                resumeRankLoading={resumeRankLoading}
+                resumeRankMessage={resumeRankMessage}
+                resumeRankError={resumeRankError}
+                onRankWithResume={(items) => void rankItemsWithResume(items, 10)}
+                onAnalyzeNext={(items) => void rankItemsWithResume(items, 10)}
+                onAnalyzeAllVisible={analyzeAllVisible}
               />
               <DailyScoutNextActions
                 onCompareRuns={() => setCompareOpen(true)}
@@ -829,6 +1147,25 @@ function parseBoardSlugs(value?: string) {
 function friendlyError(error: unknown) {
   if (error instanceof Error) return error.message;
   return "Discovery request failed. Check the backend API and try again.";
+}
+
+function statusLabel(value: string) {
+  return value.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function remoteInterest(value?: string | null) {
+  if (value === "work_from_anywhere" || value === "remote_global_unspecified") return "remote_worldwide";
+  if (value === "remote_india_eligible") return "remote_india";
+  if (value === "hybrid") return "hybrid_possible";
+  return "unknown";
+}
+
+function juniorSignal(title?: string | null, reason?: string | null) {
+  const text = `${title ?? ""} ${reason ?? ""}`.toLowerCase();
+  if (/\b(internship|intern|entry[- ]level|junior|new grad|graduate|associate)\b/.test(text)) {
+    return "moderate";
+  }
+  return "unknown";
 }
 
 function stringValue(value: unknown) {
