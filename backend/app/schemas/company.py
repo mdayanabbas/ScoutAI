@@ -64,6 +64,7 @@ class CompanyRead(CompanyBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    website_url: str | None = None
     normalized_domain: str
     created_at: datetime
     updated_at: datetime | None = None

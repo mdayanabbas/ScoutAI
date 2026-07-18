@@ -33,6 +33,8 @@ class JobMatchRepository(BaseRepository[JobMatch]):
         self,
         profile_id: str,
         *,
+        job_ids: list[str] | None = None,
+        source_platforms: list[str] | None = None,
         eligibility_status: str | None = None,
         match_tier: str | None = None,
         remote_eligibility: str | None = None,
@@ -46,6 +48,11 @@ class JobMatchRepository(BaseRepository[JobMatch]):
             .options(selectinload(JobMatch.job).selectinload(Job.company))
             .where(JobMatch.job_matching_profile_id == profile_id)
         )
+        if source_platforms:
+            stmt = stmt.join(Job, Job.id == JobMatch.job_id)
+            stmt = stmt.where(Job.source_platform.in_(source_platforms))
+        if job_ids:
+            stmt = stmt.where(JobMatch.job_id.in_(job_ids))
         if eligibility_status:
             stmt = stmt.where(JobMatch.eligibility_status == eligibility_status)
         if match_tier:

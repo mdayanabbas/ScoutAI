@@ -125,6 +125,8 @@ from app.schemas.remotive_discovery import (
     RemotiveRejectedCandidateSummary,
 )
 from app.schemas.remote_discovery import (
+    AshbyRemoteDiscoveryOptions,
+    HackerNewsRemoteDiscoveryOptions,
     HimalayasRemoteDiscoveryOptions,
     RemotiveRemoteDiscoveryOptions,
     RemoteDiscoverySourceResult,
@@ -133,6 +135,7 @@ from app.schemas.remote_discovery import (
     RemoteJobDiscoveryRunRequest,
     RemoteRecommendationSummary,
     WWRRemoteDiscoveryOptions,
+    YCombinatorRemoteDiscoveryOptions,
 )
 from app.schemas.resume import (
     ResumeActivateResponse,
@@ -262,6 +265,8 @@ __all__ = [
     "RemotiveQueryPlanRead",
     "RemotiveQueryResult",
     "RemotiveRejectedCandidateSummary",
+    "AshbyRemoteDiscoveryOptions",
+    "HackerNewsRemoteDiscoveryOptions",
     "HimalayasRemoteDiscoveryOptions",
     "RemotiveRemoteDiscoveryOptions",
     "RemoteDiscoverySourceResult",
@@ -269,6 +274,7 @@ __all__ = [
     "RemoteJobDiscoveryPlanRead",
     "RemoteJobDiscoveryRunRequest",
     "RemoteRecommendationSummary",
+    "YCombinatorRemoteDiscoveryOptions",
     "ResumeActivateResponse",
     "ResumeBulletSuggestion",
     "ResumeImprovementItem",

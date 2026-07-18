@@ -2,6 +2,7 @@ from app.jobs.job_source_detector import (
     JobSourceDetector,
     compare_registrable_domains,
     normalize_job_url,
+    parse_ashby_careers_query_url,
     parse_ashby_job_url,
     parse_yc_job_url,
 )
@@ -74,6 +75,28 @@ def test_ashby_board_and_posting_detection():
     assert posting.job_identifier == "2d6f1234"
     assert posting.canonical_url == "https://jobs.ashbyhq.com/supabase/2d6f1234"
     assert posting.evidence == {"board_level": False, "exact_posting": True}
+
+
+def test_ashby_careers_query_detection_extracts_jid_without_board_slug():
+    parsed = parse_ashby_careers_query_url("https://www.ashbyhq.com/careers?ashby_jid=posting_123&utm_source=hn")
+    result = JobSourceDetector().detect("https://www.ashbyhq.com/careers?ashby_jid=posting_123&utm_source=hn")
+
+    assert parsed is not None
+    assert parsed.job_identifier == "posting_123"
+    assert parsed.board_slug == ""
+    assert parsed.canonical_url == "https://ashbyhq.com/careers?ashby_jid=posting_123"
+    assert result.source_type == JobSourceType.ASHBY_JOB_BOARD
+    assert result.provider == "ashby"
+    assert result.supported is False
+    assert result.job_identifier == "posting_123"
+    assert result.board_slug is None
+    assert result.reason == "ashby_board_slug_missing"
+    assert result.evidence == {
+        "classification": "ashby_careers_query",
+        "ashby_jid": "posting_123",
+        "exact_posting": True,
+        "board_level": False,
+    }
 
 
 def test_ashby_different_posting_ids_remain_distinct():

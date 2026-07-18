@@ -4,7 +4,14 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-REMOTE_DISCOVERY_SOURCES = {"himalayas", "we_work_remotely", "remotive"}
+REMOTE_DISCOVERY_SOURCES = {
+    "himalayas",
+    "we_work_remotely",
+    "remotive",
+    "hacker_news",
+    "ycombinator",
+    "ashby",
+}
 
 
 class HimalayasRemoteDiscoveryOptions(BaseModel):
@@ -28,6 +35,44 @@ class RemotiveRemoteDiscoveryOptions(BaseModel):
     limit_per_request: int | None = Field(default=None, ge=1, le=500)
 
 
+class HackerNewsRemoteDiscoveryOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = True
+    feeds: list[str] = Field(default_factory=lambda: ["jobs"])
+    limit: int = Field(default=100, ge=1, le=500)
+    lookback_days: int = Field(default=30, ge=1, le=365)
+    minimum_score: int | None = Field(default=0, ge=0)
+    include_items_without_website: bool = True
+    enrich_domains: bool = True
+    ingest_jobs: bool = True
+    enrich_jobs: bool = True
+    score_jobs: bool = True
+
+
+class YCombinatorRemoteDiscoveryOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = True
+    max_pages: int = Field(default=5, ge=1, le=25)
+    remote_only: bool = False
+    include_recent_only: bool = True
+    lookback_days: int = Field(default=60, ge=1, le=365)
+    ingest_jobs: bool = True
+    enrich_jobs: bool = True
+    score_jobs: bool = True
+
+
+class AshbyRemoteDiscoveryOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = True
+    board_slugs: list[str] = Field(default_factory=list)
+    max_jobs_per_board: int = Field(default=50, ge=1, le=200)
+    enrich_jobs: bool = True
+    score_jobs: bool = True
+
+
 class RemoteJobDiscoveryRunRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -37,6 +82,9 @@ class RemoteJobDiscoveryRunRequest(BaseModel):
     himalayas: HimalayasRemoteDiscoveryOptions | None = None
     we_work_remotely: WWRRemoteDiscoveryOptions | None = None
     remotive: RemotiveRemoteDiscoveryOptions | None = None
+    hacker_news: HackerNewsRemoteDiscoveryOptions | None = None
+    ycombinator: YCombinatorRemoteDiscoveryOptions | None = None
+    ashby: AshbyRemoteDiscoveryOptions | None = None
 
     @field_validator("sources")
     @classmethod
@@ -85,6 +133,16 @@ class RemoteDiscoverySourceResult(BaseModel):
     candidates_created: int = 0
     candidates_existing: int = 0
     candidates_rejected: int = 0
+    candidates_found: int = 0
+    candidates_normalized: int = 0
+    candidates_deferred: int = 0
+    candidates_failed: int = 0
+    companies_created: int = 0
+    companies_matched: int = 0
+    domains_resolved: int = 0
+    domains_unresolved: int = 0
+    jobs_skipped: int = 0
+    jobs_enriched: int = 0
     provider_records_seen: int = 0
     unique_records: int = 0
     accepted_jobs_count: int = 0
@@ -93,6 +151,7 @@ class RemoteDiscoverySourceResult(BaseModel):
     rejected_samples: list[dict[str, Any]] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     error: str | None = None
+    diagnostics: dict[str, Any] = Field(default_factory=dict)
 
 
 class RemoteJobDiscoveryPlanRead(BaseModel):
@@ -103,6 +162,10 @@ class RemoteJobDiscoveryPlanRead(BaseModel):
     himalayas: dict[str, Any] | None = None
     we_work_remotely: dict[str, Any] | None = None
     remotive: dict[str, Any] | None = None
+    hacker_news: dict[str, Any] | None = None
+    ycombinator: dict[str, Any] | None = None
+    ashby: dict[str, Any] | None = None
+    available_sources: list[dict[str, Any]] = Field(default_factory=list)
     recommended_defaults: dict[str, Any]
     warnings: list[str] = Field(default_factory=list)
 
@@ -127,6 +190,9 @@ class RemoteJobDiscoveryOrchestratorResult(BaseModel):
     total_jobs_failed: int = 0
     source_results: list[RemoteDiscoverySourceResult] = Field(default_factory=list)
     top_recommendations: list[RemoteRecommendationSummary] = Field(default_factory=list)
+    recommendation_scope: str = "global"
+    recommendation_source_filter: list[str] = Field(default_factory=list)
+    recommendation_job_ids_count: int = 0
     started_at: datetime
     finished_at: datetime
     duration_ms: int

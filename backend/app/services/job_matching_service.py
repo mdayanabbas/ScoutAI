@@ -155,6 +155,8 @@ class JobMatchingService:
         self,
         profile_id: str,
         *,
+        job_ids: list[str] | None = None,
+        source_platforms: list[str] | None = None,
         eligibility_status: str | None = None,
         match_tier: str | None = None,
         remote_eligibility: str | None = None,
@@ -167,6 +169,8 @@ class JobMatchingService:
     ) -> list[JobMatch]:
         matches = self.match_repository.list_for_profile(
             profile_id,
+            job_ids=job_ids,
+            source_platforms=source_platforms,
             eligibility_status=eligibility_status,
             match_tier=match_tier,
             remote_eligibility=remote_eligibility,

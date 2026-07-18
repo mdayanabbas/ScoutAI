@@ -140,6 +140,32 @@ class JobSourceDetector:
                 },
             )
 
+        ashby_careers = parse_ashby_careers_query_url(normalized.canonical_url)
+        if ashby_careers:
+            logger.info(
+                "Ashby careers query parsed",
+                extra={"job_identifier": ashby_careers.job_identifier},
+            )
+            return JobSourceDetectionResult(
+                source_type=JobSourceType.ASHBY_JOB_BOARD,
+                original_url=normalized.original_url,
+                normalized_url=normalized.normalized_url,
+                canonical_url=ashby_careers.canonical_url,
+                normalized_domain=normalized.normalized_domain,
+                provider="ashby",
+                job_identifier=ashby_careers.job_identifier,
+                path=normalized.path,
+                supported=False,
+                confidence=0.7,
+                reason="ashby_board_slug_missing",
+                evidence={
+                    "classification": "ashby_careers_query",
+                    "ashby_jid": ashby_careers.job_identifier,
+                    "exact_posting": True,
+                    "board_level": False,
+                },
+            )
+
         if company_domain and compare_registrable_domains(
             normalized.normalized_domain, company_domain
         ):
@@ -278,6 +304,27 @@ def parse_ashby_job_url(value: str | None) -> AshbyJobURL | None:
             f"https://jobs.ashbyhq.com/{quote(board_slug, safe='-._~')}/"
             f"{quote(posting_id, safe='-._~')}"
         ),
+        board_level=False,
+        exact_posting=True,
+    )
+
+
+def parse_ashby_careers_query_url(value: str | None) -> AshbyJobURL | None:
+    normalized = normalize_job_url(value)
+    if not normalized.valid or normalized.normalized_domain != "ashbyhq.com":
+        return None
+    parsed = urlparse(normalized.canonical_url or "")
+    if parsed.path not in {"", "/careers"}:
+        return None
+    params = dict(parse_qsl(parsed.query, keep_blank_values=False))
+    posting_id = params.get("ashby_jid")
+    if not posting_id or not ASHBY_SAFE_PART_RE.fullmatch(posting_id):
+        return None
+    canonical = f"https://ashbyhq.com/careers?{urlencode({'ashby_jid': posting_id})}"
+    return AshbyJobURL(
+        board_slug="",
+        job_identifier=posting_id,
+        canonical_url=canonical,
         board_level=False,
         exact_posting=True,
     )
