@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
+import { ApplicationActionCenter } from "@/components/discovery/ApplicationActionCenter";
 import {
   formatMatchTier,
   formatRemoteEligibility,
@@ -11,8 +12,8 @@ import {
   normalizeExternalUrl,
 } from "@/components/recommendations/recommendation-format";
 import type { DailyScoutReviewItem, DailyScoutReviewStatus } from "@/lib/daily-scout-review-queue";
-import { buildResumeAwareReviewRanking } from "@/lib/resume-aware-review-ranking";
-import type { JobDecisionStatus } from "@/types/job-decision";
+import { buildResumeAwareReviewRanking, type ResumeFitResult } from "@/lib/resume-aware-review-ranking";
+import type { JobApplicationDecisionResponse, JobDecisionStatus } from "@/types/job-decision";
 import type { ResumeResponse } from "@/types/resume";
 
 type QueueFilter =
@@ -73,6 +74,9 @@ export function DailyScoutReviewQueue({
   onRankWithResume,
   onAnalyzeNext,
   onAnalyzeAllVisible,
+  onActionCenterDecisionUpdated,
+  onActionCenterWatchUpdated,
+  onActionCenterResumeFitUpdated,
 }: {
   items: DailyScoutReviewItem[];
   loading: boolean;
@@ -96,12 +100,16 @@ export function DailyScoutReviewQueue({
   onRankWithResume: (items: DailyScoutReviewItem[]) => void;
   onAnalyzeNext: (items: DailyScoutReviewItem[]) => void;
   onAnalyzeAllVisible: (items: DailyScoutReviewItem[]) => void;
+  onActionCenterDecisionUpdated: (item: DailyScoutReviewItem, decision: JobApplicationDecisionResponse) => void;
+  onActionCenterWatchUpdated: (item: DailyScoutReviewItem) => void;
+  onActionCenterResumeFitUpdated: (item: DailyScoutReviewItem, result: ResumeFitResult) => void;
 }) {
   const [filter, setFilter] = useState<QueueFilter>("all");
   const [sort, setSort] = useState<QueueSort>("recommended");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [actionCenterItem, setActionCenterItem] = useState<DailyScoutReviewItem | null>(null);
 
   const sources = useMemo(
     () => Array.from(new Set(items.map((item) => item.source_name ?? item.source_platform).filter(Boolean) as string[])).sort(),
@@ -293,9 +301,57 @@ export function DailyScoutReviewQueue({
             onWatchCompany={onWatchCompany}
             onOpenedWorkspace={onOpenedWorkspace}
             onCopyJobUrl={onCopyJobUrl}
+            onOpenActionCenter={setActionCenterItem}
           />
         ))}
       </div>
+
+      {actionCenterItem ? (
+        <ApplicationActionCenter
+          reviewItem={actionCenterItem}
+          activeResume={activeResume}
+          existingDecision={actionCenterItem.decision ?? null}
+          resumeFitResult={
+            actionCenterItem.resume_analysis_status
+              ? {
+                  resume_fit_score: actionCenterItem.resume_fit_score ?? null,
+                  resume_fit_tier: actionCenterItem.resume_fit_tier ?? "unknown",
+                  resume_fit_summary: actionCenterItem.resume_fit_summary ?? null,
+                  resume_strengths: actionCenterItem.resume_strengths ?? [],
+                  resume_gaps: actionCenterItem.resume_gaps ?? [],
+                  resume_bullet_sources: actionCenterItem.resume_bullet_sources ?? [],
+                  resume_action: actionCenterItem.resume_action ?? "needs_review",
+                  resume_analysis_status: actionCenterItem.resume_analysis_status,
+                  resume_analysis_error: actionCenterItem.resume_analysis_error,
+                }
+              : null
+          }
+          onDecisionUpdated={(decision) => {
+            onActionCenterDecisionUpdated(actionCenterItem, decision);
+            setActionCenterItem((current) =>
+              current
+                ? {
+                    ...current,
+                    decision,
+                    decision_id: decision.id,
+                    decision_status: decision.decision_status ?? decision.status,
+                  }
+                : current,
+            );
+          }}
+          onWatchCompanyUpdated={() => {
+            onActionCenterWatchUpdated(actionCenterItem);
+            setActionCenterItem((current) =>
+              current ? { ...current, company_watch_status: "watching", review_status: "watched_company" } : current,
+            );
+          }}
+          onResumeFitUpdated={(result) => {
+            onActionCenterResumeFitUpdated(actionCenterItem, result);
+            setActionCenterItem((current) => current ? { ...current, ...result } : current);
+          }}
+          onClose={() => setActionCenterItem(null)}
+        />
+      ) : null}
     </section>
   );
 }
@@ -396,6 +452,7 @@ function DailyScoutReviewCard({
   onWatchCompany,
   onOpenedWorkspace,
   onCopyJobUrl,
+  onOpenActionCenter,
 }: {
   item: DailyScoutReviewItem;
   selected: boolean;
@@ -404,6 +461,7 @@ function DailyScoutReviewCard({
   onWatchCompany: (item: DailyScoutReviewItem) => void;
   onOpenedWorkspace: (item: DailyScoutReviewItem) => void;
   onCopyJobUrl: (item: DailyScoutReviewItem) => void;
+  onOpenActionCenter: (item: DailyScoutReviewItem) => void;
 }) {
   const external = normalizeExternalUrl(item.apply_url) ?? normalizeExternalUrl(item.job_url);
   const salary = formatSalary({
@@ -444,7 +502,14 @@ function DailyScoutReviewCard({
             <p className="mt-3 text-sm leading-6 text-[#344054]">{item.eligibility_reason}</p>
           ) : null}
         </div>
-          <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
+        <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
+          <button
+            type="button"
+            onClick={() => onOpenActionCenter(item)}
+            className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]"
+          >
+            Action Center
+          </button>
           {item.resume_action ? <ResumePrimaryAction item={item} onDecisionAction={onDecisionAction} /> : null}
           {decisionActions.map((action) => (
             <button

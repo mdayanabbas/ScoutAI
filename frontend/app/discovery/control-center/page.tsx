@@ -840,6 +840,26 @@ export default function DiscoveryControlCenterPage() {
                 onRankWithResume={(items) => void rankItemsWithResume(items, 10)}
                 onAnalyzeNext={(items) => void rankItemsWithResume(items, 10)}
                 onAnalyzeAllVisible={analyzeAllVisible}
+                onActionCenterDecisionUpdated={(item, decision) => {
+                  const status = decision.decision_status ?? decision.status ?? "saved";
+                  setDecisionOverrides((current) => ({ ...current, [item.job_id]: decision }));
+                  setReviewState((current) =>
+                    upsertDailyScoutReviewState(current, item.job_id, reviewStatusFromDecisionStatus(status)),
+                  );
+                  setReviewMessage(`${item.title} marked as ${statusLabel(status)}.`);
+                }}
+                onActionCenterWatchUpdated={(item) => {
+                  setWatchOverrides((current) => ({ ...current, [item.job_id]: "watching" }));
+                  setReviewState((current) => upsertDailyScoutReviewState(current, item.job_id, "watched_company"));
+                  setReviewMessage(item.company_name ? `${item.company_name} added to watchlist.` : "Company added to watchlist.");
+                }}
+                onActionCenterResumeFitUpdated={(item, result) => {
+                  setResumeFitOverrides((current) => ({ ...current, [item.job_id]: result }));
+                  const resumeId = activeResumeQuery.data?.id;
+                  if (resumeId) {
+                    setResumeFitCache((current) => upsertResumeFitCache(current, item.job_id, resumeId, result));
+                  }
+                }}
               />
               <DailyScoutNextActions
                 onCompareRuns={() => setCompareOpen(true)}
