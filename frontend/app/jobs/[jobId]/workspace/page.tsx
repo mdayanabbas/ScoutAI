@@ -22,12 +22,14 @@ import {
   sourceAttribution,
 } from "@/components/recommendations/recommendation-format";
 import { useActiveResume } from "@/hooks/use-resumes";
+import {
+  buildApplicationExportFilename,
+  buildApplicationExportMarkdown,
+  copyApplicationPackMarkdown,
+  downloadMarkdownFile,
+} from "@/lib/application-export-pack";
 import { generateApplicationPacketForDecision, generateApplicationPacketForJob } from "@/lib/application-packet-api";
 import { generateApplicationPrepForDecision, generateApplicationPrepForJob } from "@/lib/application-prep-api";
-import {
-  buildApplicationWorkspaceMarkdown,
-  buildWorkspaceMarkdownFilename,
-} from "@/lib/application-workspace-markdown";
 import { getJobDecision, listJobDecisions, saveJobDecision, updateJobDecision } from "@/lib/job-decisions-api";
 import { fetchRecommendedJobMatches } from "@/lib/job-matches-api";
 import { getJob } from "@/lib/jobs-api";
@@ -96,51 +98,55 @@ export default function JobWorkspacePage() {
   const checklistItems = checklistDefaults.map((label) => ({ label, checked: Boolean(checked[label]) }));
 
   function buildMarkdown() {
-    return buildApplicationWorkspaceMarkdown({
-      job: {
+    return buildApplicationExportMarkdown({
+      reviewItem: {
+        job_id: display.id,
         title: display.title,
-        companyName: display.companyName,
-        role: labelize(display.roleCategory) || display.title,
-        source: attribution.label.replace("Source: ", ""),
-        applyUrl,
-        matchTier: formatMatchTier(display.matchTier),
-        totalScore: display.totalScore,
-        remoteEligibility: formatRemoteEligibility(display.remoteEligibility),
-        decisionStatus: currentDecision?.decision_status ?? currentDecision?.status ?? null,
+        company_name: display.companyName ?? null,
+        company_id: display.companyId,
+        source_platform: attribution.label.replace("Source: ", ""),
+        remote_eligibility: display.remoteEligibility,
+        match_tier: display.matchTier,
+        eligibility_status: recommendedMatch?.eligibility_status ?? null,
+        total_score: display.totalScore,
+        eligibility_reason: display.eligibilityReason,
+        salary_min: display.salary_min,
+        salary_max: display.salary_max,
+        salary_currency: display.salary_currency,
+        job_url: display.jobUrl,
+        apply_url: display.applyUrl,
+        decision: currentDecision,
+        decision_id: currentDecision?.id ?? null,
+        decision_status: currentDecision?.decision_status ?? currentDecision?.status ?? null,
+        review_status: "unreviewed",
+        created_from: "fallback_recommendations",
+        raw: { source: "application_workspace" },
       },
       activeResume: activeResumeQuery.data ?? null,
-      packet,
-      improvement,
-      prep,
-      checklist: checklistItems,
-      notes: visibleNotes,
+      applicationPacket: packet,
+      resumeImprovement: improvement,
+      prepNotes: prep,
+      decision: visibleNotes && currentDecision ? { ...currentDecision, notes: visibleNotes } : currentDecision,
+      nextAction: prep?.suggested_next_action ?? currentDecision?.next_action ?? null,
     });
   }
 
   async function copyMarkdown() {
-    try {
-      await navigator.clipboard.writeText(buildMarkdown());
-      setExportMessage("Copied workspace Markdown.");
-    } catch {
-      setExportMessage("Could not copy Markdown.");
-    }
+    const result = await copyApplicationPackMarkdown(buildMarkdown());
+    setExportMessage(result.ok ? "Copied application pack Markdown." : result.error ?? "Could not copy Markdown.");
   }
 
   function downloadMarkdown() {
-    try {
-      const blob = new Blob([buildMarkdown()], { type: "text/markdown;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = buildWorkspaceMarkdownFilename(display.companyName, display.title);
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
-      setExportMessage("Downloaded workspace Markdown.");
-    } catch {
-      setExportMessage("Could not download Markdown.");
-    }
+    const filename = buildApplicationExportFilename({
+      job_id: display.id,
+      title: display.title,
+      company_name: display.companyName ?? null,
+      review_status: "unreviewed",
+      created_from: "fallback_recommendations",
+      raw: { source: "application_workspace" },
+    });
+    const result = downloadMarkdownFile(filename, buildMarkdown());
+    setExportMessage(result.ok ? "Downloaded application pack Markdown." : result.error ?? "Could not download Markdown.");
   }
 
   async function ensureDecision(payload: JobDecisionPayload) {

@@ -13,6 +13,12 @@ import {
   formatSalary,
   normalizeExternalUrl,
 } from "@/components/recommendations/recommendation-format";
+import {
+  buildApplicationExportFilename,
+  buildApplicationExportMarkdown,
+  copyApplicationPackMarkdown,
+  downloadMarkdownFile,
+} from "@/lib/application-export-pack";
 import { generateApplicationPacketForJob } from "@/lib/application-packet-api";
 import { generateApplicationPrepForJob } from "@/lib/application-prep-api";
 import { watchCompanyFromJob } from "@/lib/company-watchlist-api";
@@ -67,6 +73,9 @@ export function ApplicationActionCenter({
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [exportWarning, setExportWarning] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const jobUrl = normalizeExternalUrl(reviewItem.job_url);
   const applyUrl = normalizeExternalUrl(reviewItem.apply_url);
@@ -76,6 +85,13 @@ export function ApplicationActionCenter({
     salary_currency: reviewItem.salary_currency,
   });
   const nextAction = recommendedNextAction(reviewItem, fit, decision);
+  const exportMarkdown = buildExportMarkdown();
+  const exportFilename = buildApplicationExportFilename(reviewItem);
+  const missingMaterials = [
+    !packet ? "application packet" : null,
+    !improvement ? "resume improvements" : null,
+    !prep ? "prep notes" : null,
+  ].filter(Boolean);
 
   async function runSection<T>(key: string, task: () => Promise<T>, onSuccess: (value: T) => void) {
     setLoading((current) => ({ ...current, [key]: true }));
@@ -94,15 +110,7 @@ export function ApplicationActionCenter({
     if (!reviewItem.job_id) return;
     void runSection(
       "packet",
-      () =>
-        generateApplicationPacketForJob(reviewItem.job_id, {
-          update_decision: false,
-          include_resume_bullets: true,
-          include_cover_note_outline: true,
-          include_cold_dm_outline: true,
-          include_checklist: true,
-          include_risk_review: true,
-        }),
+      fetchPacket,
       setPacket,
     );
   }
@@ -111,15 +119,7 @@ export function ApplicationActionCenter({
     if (!reviewItem.job_id) return;
     void runSection(
       "improvement",
-      () =>
-        generateResumeImprovementForJob(reviewItem.job_id, {
-          update_decision: false,
-          include_section_suggestions: true,
-          include_bullet_suggestions: true,
-          include_skill_gap_suggestions: true,
-          include_project_reordering: true,
-          include_remote_fit_suggestions: true,
-        }),
+      fetchImprovement,
       setImprovement,
     );
   }
@@ -128,9 +128,35 @@ export function ApplicationActionCenter({
     if (!reviewItem.job_id) return;
     void runSection(
       "prep",
-      () => generateApplicationPrepForJob(reviewItem.job_id, { update_decision: false }),
+      fetchPrep,
       setPrep,
     );
+  }
+
+  function fetchPacket() {
+    return generateApplicationPacketForJob(reviewItem.job_id, {
+      update_decision: false,
+      include_resume_bullets: true,
+      include_cover_note_outline: true,
+      include_cold_dm_outline: true,
+      include_checklist: true,
+      include_risk_review: true,
+    });
+  }
+
+  function fetchImprovement() {
+    return generateResumeImprovementForJob(reviewItem.job_id, {
+      update_decision: false,
+      include_section_suggestions: true,
+      include_bullet_suggestions: true,
+      include_skill_gap_suggestions: true,
+      include_project_reordering: true,
+      include_remote_fit_suggestions: true,
+    });
+  }
+
+  function fetchPrep() {
+    return generateApplicationPrepForJob(reviewItem.job_id, { update_decision: false });
   }
 
   function rankWithResume() {
@@ -220,6 +246,72 @@ export function ApplicationActionCenter({
     }
   }
 
+  function buildExportMarkdown() {
+    return buildApplicationExportMarkdown({
+      reviewItem,
+      activeResume,
+      resumeFitResult: fit,
+      applicationPacket: packet,
+      resumeImprovement: improvement,
+      prepNotes: prep,
+      decision,
+      watchlistItem,
+      nextAction,
+    });
+  }
+
+  async function copyExportMarkdown() {
+    const result = await copyApplicationPackMarkdown(buildExportMarkdown());
+    setExportMessage(result.ok ? "Copied application pack Markdown." : result.error ?? "Could not copy Markdown.");
+  }
+
+  function downloadExportMarkdown() {
+    const result = downloadMarkdownFile(buildApplicationExportFilename(reviewItem), buildExportMarkdown());
+    setExportMessage(result.ok ? "Downloaded application pack Markdown." : result.error ?? "Could not download Markdown.");
+  }
+
+  async function generateMissingMaterials() {
+    if (!reviewItem.job_id) return;
+    setLoading((current) => ({ ...current, exportGenerate: true }));
+    setExportWarning(null);
+    setExportMessage(null);
+    const failures: string[] = [];
+    let generated = 0;
+    try {
+      if (!packet) {
+        try {
+          setPacket(await fetchPacket());
+          generated += 1;
+        } catch {
+          failures.push("application packet");
+        }
+      }
+      if (!improvement) {
+        try {
+          setImprovement(await fetchImprovement());
+          generated += 1;
+        } catch {
+          failures.push("resume improvements");
+        }
+      }
+      if (!prep) {
+        try {
+          setPrep(await fetchPrep());
+          generated += 1;
+        } catch {
+          failures.push("prep notes");
+        }
+      }
+      if (failures.length) {
+        setExportWarning(`Generated ${generated} material${generated === 1 ? "" : "s"}. Could not generate: ${failures.join(", ")}.`);
+      } else {
+        setExportMessage(generated ? "Generated missing materials." : "All materials were already available.");
+      }
+    } finally {
+      setLoading((current) => ({ ...current, exportGenerate: false }));
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 bg-[#101828]/30">
       <div className="absolute right-0 top-0 h-full w-full max-w-4xl overflow-y-auto bg-white p-5 shadow-xl">
@@ -262,6 +354,30 @@ export function ApplicationActionCenter({
 
           <Panel title="Recommended Next Action">
             <p className="text-base font-semibold text-[#171923]">{nextAction}</p>
+          </Panel>
+
+          <Panel title="Export Pack">
+            <div className="flex flex-wrap gap-2">
+              <SectionButton loading={loading.exportGenerate} onClick={() => void generateMissingMaterials()}>
+                Generate Missing Materials
+              </SectionButton>
+              <button type="button" onClick={() => void copyExportMarkdown()} className="mt-3 rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
+                Copy Markdown
+              </button>
+              <button type="button" onClick={downloadExportMarkdown} className="mt-3 rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
+                Download Markdown
+              </button>
+              <button type="button" onClick={() => setPreviewOpen(true)} className="mt-3 rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
+                Preview Markdown
+              </button>
+            </div>
+            {missingMaterials.length ? (
+              <p className="mt-3 rounded border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-sm text-[#9a3412]">
+                Some generated materials are missing: {missingMaterials.join(", ")}. Export will include available sections only.
+              </p>
+            ) : null}
+            {exportWarning ? <p className="mt-3 rounded border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-sm text-[#9a3412]">{exportWarning}</p> : null}
+            {exportMessage ? <p className="mt-3 rounded border border-[#d9dee8] bg-[#fcfcfd] px-3 py-2 text-sm text-[#344054]">{exportMessage}</p> : null}
           </Panel>
 
           <Panel title="Resume Fit">
@@ -328,6 +444,32 @@ export function ApplicationActionCenter({
           </Panel>
         </div>
       </div>
+      {previewOpen ? (
+        <div className="fixed inset-0 z-[60] bg-[#101828]/40 p-4">
+          <div className="mx-auto flex h-full max-w-5xl flex-col rounded-md bg-white shadow-xl">
+            <div className="flex flex-col gap-3 border-b border-[#e4e7ec] p-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="text-base font-semibold text-[#171923]">Preview Markdown</h3>
+                <p className="mt-1 break-all text-sm text-[#667085]">{exportFilename}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => void copyExportMarkdown()} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
+                  Copy Markdown
+                </button>
+                <button type="button" onClick={downloadExportMarkdown} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
+                  Download Markdown
+                </button>
+                <button type="button" onClick={() => setPreviewOpen(false)} className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">
+                  Close
+                </button>
+              </div>
+            </div>
+            <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap bg-[#101828] p-4 text-sm leading-6 text-[#f8fafc]">
+              <code>{exportMarkdown}</code>
+            </pre>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
