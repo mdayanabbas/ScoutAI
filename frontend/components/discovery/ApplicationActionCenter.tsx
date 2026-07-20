@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
 import { ApplicationPacketPanel } from "@/components/applications/ApplicationPacketPanel";
@@ -19,6 +19,28 @@ import {
   copyApplicationPackMarkdown,
   downloadMarkdownFile,
 } from "@/lib/application-export-pack";
+import {
+  applicationFollowUpStorage,
+  outreachTypeFromDraftTarget,
+  type ApplicationFollowUpItem,
+} from "@/lib/application-follow-ups";
+import {
+  buildColdDmDraft,
+  coldDmLengthOptions,
+  coldDmTargetOptions,
+  coldDmToneOptions,
+  copyColdDmDraft,
+  defaultColdDmLength,
+  deleteSavedColdDmDraft,
+  generateColdDmVariants,
+  saveColdDmDraft,
+  savedDraftsForJob,
+  type ColdDmDraftResult,
+  type ColdDmLength,
+  type ColdDmTargetType,
+  type ColdDmTone,
+  type SavedColdDmDraft,
+} from "@/lib/cold-dm-draft";
 import { generateApplicationPacketForJob } from "@/lib/application-packet-api";
 import { generateApplicationPrepForJob } from "@/lib/application-prep-api";
 import { watchCompanyFromJob } from "@/lib/company-watchlist-api";
@@ -52,6 +74,7 @@ export function ApplicationActionCenter({
   onDecisionUpdated,
   onWatchCompanyUpdated,
   onResumeFitUpdated,
+  initialSection,
   onClose,
 }: {
   reviewItem: DailyScoutReviewItem;
@@ -62,6 +85,7 @@ export function ApplicationActionCenter({
   onDecisionUpdated?: (decision: JobApplicationDecisionResponse) => void;
   onWatchCompanyUpdated?: (watchlistItem: CompanyWatchlistResponse | null) => void;
   onResumeFitUpdated?: (result: ResumeFitResult) => void;
+  initialSection?: "cold_dm" | "export";
   onClose: () => void;
 }) {
   const [packet, setPacket] = useState<ApplicationPacketResponse | null>(null);
@@ -76,6 +100,27 @@ export function ApplicationActionCenter({
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [exportWarning, setExportWarning] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [coldDmTarget, setColdDmTarget] = useState<ColdDmTargetType>("founder");
+  const [coldDmTone, setColdDmTone] = useState<ColdDmTone>("confident");
+  const [coldDmLength, setColdDmLength] = useState<ColdDmLength>("medium");
+  const [includeProjects, setIncludeProjects] = useState(true);
+  const [includeResumeFit, setIncludeResumeFit] = useState(true);
+  const [includeRemoteFit, setIncludeRemoteFit] = useState(true);
+  const [includeAsk, setIncludeAsk] = useState(true);
+  const [includeColdDmOutline, setIncludeColdDmOutline] = useState(true);
+  const [recipientName, setRecipientName] = useState("");
+  const [companyContext, setCompanyContext] = useState("");
+  const [customProofPoint, setCustomProofPoint] = useState("");
+  const [customAsk, setCustomAsk] = useState("");
+  const [coldDmDrafts, setColdDmDrafts] = useState<ColdDmDraftResult[]>([]);
+  const [selectedColdDmDraftId, setSelectedColdDmDraftId] = useState<string | null>(null);
+  const [savedDrafts, setSavedDrafts] = useState<SavedColdDmDraft[]>([]);
+  const [coldDmMessage, setColdDmMessage] = useState<string | null>(null);
+  const [coldDmError, setColdDmError] = useState<string | null>(null);
+  const [followUps, setFollowUps] = useState<ApplicationFollowUpItem[]>([]);
+  const [followUpDueDate, setFollowUpDueDate] = useState("");
+  const [followUpMessage, setFollowUpMessage] = useState<string | null>(null);
+  const [followUpError, setFollowUpError] = useState<string | null>(null);
 
   const jobUrl = normalizeExternalUrl(reviewItem.job_url);
   const applyUrl = normalizeExternalUrl(reviewItem.apply_url);
@@ -92,6 +137,21 @@ export function ApplicationActionCenter({
     !improvement ? "resume improvements" : null,
     !prep ? "prep notes" : null,
   ].filter(Boolean);
+  const selectedColdDmDraft = coldDmDrafts.find((draft) => draft.id === selectedColdDmDraftId) ?? coldDmDrafts[0] ?? null;
+
+  useEffect(() => {
+    setSavedDrafts(savedDraftsForJob(reviewItem.job_id));
+    setFollowUps(applicationFollowUpStorage.getFollowUpsForJob(reviewItem.job_id));
+  }, [reviewItem.job_id]);
+
+  useEffect(() => {
+    if (initialSection === "cold_dm") {
+      window.setTimeout(() => document.getElementById("cold-dm-builder")?.scrollIntoView({ block: "start", behavior: "smooth" }), 0);
+    }
+    if (initialSection === "export") {
+      window.setTimeout(() => document.getElementById("export-pack")?.scrollIntoView({ block: "start", behavior: "smooth" }), 0);
+    }
+  }, [initialSection]);
 
   async function runSection<T>(key: string, task: () => Promise<T>, onSuccess: (value: T) => void) {
     setLoading((current) => ({ ...current, [key]: true }));
@@ -256,6 +316,7 @@ export function ApplicationActionCenter({
       prepNotes: prep,
       decision,
       watchlistItem,
+      coldDmDrafts: [...coldDmDrafts, ...savedDrafts],
       nextAction,
     });
   }
@@ -312,6 +373,120 @@ export function ApplicationActionCenter({
     }
   }
 
+  function coldDmInput(tone = coldDmTone) {
+    return {
+      reviewItem,
+      activeResume,
+      resumeFitResult: fit,
+      applicationPacket: packet,
+      resumeImprovement: improvement,
+      prepNotes: prep,
+      decision,
+      watchlistItem,
+      targetType: coldDmTarget,
+      tone,
+      length: coldDmLength,
+      includeProjects,
+      includeResumeFit,
+      includeRemoteFit,
+      includeAsk,
+      includeColdDmOutline,
+      customRecipientName: recipientName,
+      customCompanyContext: companyContext,
+      customProofPoint,
+      customAsk,
+    };
+  }
+
+  function generateColdDmDraft() {
+    setColdDmError(null);
+    const draft = buildColdDmDraft(coldDmInput());
+    setColdDmDrafts([draft]);
+    setSelectedColdDmDraftId(draft.id);
+    setColdDmMessage("Generated cold DM draft.");
+  }
+
+  function regenerateColdDmDraft() {
+    generateColdDmDraft();
+  }
+
+  function generateColdDmVariantDrafts() {
+    setColdDmError(null);
+    const variants = generateColdDmVariants(coldDmInput());
+    setColdDmDrafts(variants);
+    setSelectedColdDmDraftId(variants[0]?.id ?? null);
+    setColdDmMessage("Generated three draft variants.");
+  }
+
+  async function copyDraft(draft: ColdDmDraftResult | SavedColdDmDraft) {
+    const result = await copyColdDmDraft(draft.body);
+    setColdDmMessage(result.ok ? "Copied cold DM draft." : result.error ?? "Could not copy draft.");
+    if (result.ok) setColdDmError(null);
+  }
+
+  function saveDraft(draft: ColdDmDraftResult) {
+    const result = saveColdDmDraft(draft, reviewItem);
+    if (!result.ok) {
+      setColdDmError(result.error ?? "Could not save draft locally.");
+      return;
+    }
+    setSavedDrafts(savedDraftsForJob(reviewItem.job_id));
+    setColdDmMessage("Saved draft locally.");
+    setColdDmError(null);
+  }
+
+  function deleteDraft(draftId: string) {
+    const result = deleteSavedColdDmDraft(draftId);
+    if (!result.ok) {
+      setColdDmError(result.error ?? "Could not delete draft.");
+      return;
+    }
+    setSavedDrafts(savedDraftsForJob(reviewItem.job_id));
+    setColdDmMessage("Deleted saved draft.");
+  }
+
+  function refreshFollowUps(note?: string) {
+    setFollowUps(applicationFollowUpStorage.getFollowUpsForJob(reviewItem.job_id));
+    if (note) setFollowUpMessage(note);
+  }
+
+  function trackDraft(status: "drafted" | "copied", draft: ColdDmDraftResult | SavedColdDmDraft | null = selectedColdDmDraft) {
+    if (!draft) {
+      setFollowUpError("Generate or select a draft first.");
+      return;
+    }
+    const result = status === "drafted"
+      ? applicationFollowUpStorage.markDrafted(reviewItem.job_id, { draft, message_target: recipientName || null }, reviewItem)
+      : applicationFollowUpStorage.markCopied(reviewItem.job_id, { draft, message_target: recipientName || null }, reviewItem);
+    if (!result.ok) {
+      setFollowUpError(result.error ?? "Could not track follow-up.");
+      return;
+    }
+    setFollowUpError(null);
+    refreshFollowUps(status === "drafted" ? "Tracked draft." : "Tracked copied draft.");
+  }
+
+  function markOutreachSent() {
+    const due = followUpDueDate ? new Date(followUpDueDate).toISOString() : undefined;
+    const result = applicationFollowUpStorage.markSentManually(reviewItem.job_id, new Date().toISOString(), due);
+    if (!result.ok) {
+      setFollowUpError(result.error ?? "Could not mark outreach sent.");
+      return;
+    }
+    setFollowUpError(null);
+    refreshFollowUps("Marked outreach as manually sent.");
+  }
+
+  function updateFollowUp(id: string, changes: Partial<ApplicationFollowUpItem>, note: string) {
+    const result = applicationFollowUpStorage.updateFollowUp(id, changes);
+    if (!result.ok) {
+      setFollowUpError(result.error ?? "Could not update follow-up.");
+      return;
+    }
+    setFollowUpError(null);
+    refreshFollowUps(note);
+  }
+
   return (
     <div className="fixed inset-0 z-50 bg-[#101828]/30">
       <div className="absolute right-0 top-0 h-full w-full max-w-4xl overflow-y-auto bg-white p-5 shadow-xl">
@@ -356,29 +531,138 @@ export function ApplicationActionCenter({
             <p className="text-base font-semibold text-[#171923]">{nextAction}</p>
           </Panel>
 
-          <Panel title="Export Pack">
-            <div className="flex flex-wrap gap-2">
-              <SectionButton loading={loading.exportGenerate} onClick={() => void generateMissingMaterials()}>
-                Generate Missing Materials
-              </SectionButton>
-              <button type="button" onClick={() => void copyExportMarkdown()} className="mt-3 rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
-                Copy Markdown
-              </button>
-              <button type="button" onClick={downloadExportMarkdown} className="mt-3 rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
-                Download Markdown
-              </button>
-              <button type="button" onClick={() => setPreviewOpen(true)} className="mt-3 rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
-                Preview Markdown
-              </button>
-            </div>
-            {missingMaterials.length ? (
-              <p className="mt-3 rounded border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-sm text-[#9a3412]">
-                Some generated materials are missing: {missingMaterials.join(", ")}. Export will include available sections only.
-              </p>
-            ) : null}
-            {exportWarning ? <p className="mt-3 rounded border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-sm text-[#9a3412]">{exportWarning}</p> : null}
-            {exportMessage ? <p className="mt-3 rounded border border-[#d9dee8] bg-[#fcfcfd] px-3 py-2 text-sm text-[#344054]">{exportMessage}</p> : null}
-          </Panel>
+          <section id="export-pack">
+            <Panel title="Export Pack">
+              <div className="flex flex-wrap gap-2">
+                <SectionButton loading={loading.exportGenerate} onClick={() => void generateMissingMaterials()}>
+                  Generate Missing Materials
+                </SectionButton>
+                <button type="button" onClick={() => void copyExportMarkdown()} className="mt-3 rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
+                  Copy Markdown
+                </button>
+                <button type="button" onClick={downloadExportMarkdown} className="mt-3 rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
+                  Download Markdown
+                </button>
+                <button type="button" onClick={() => setPreviewOpen(true)} className="mt-3 rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
+                  Preview Markdown
+                </button>
+              </div>
+              {missingMaterials.length ? (
+                <p className="mt-3 rounded border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-sm text-[#9a3412]">
+                  Some generated materials are missing: {missingMaterials.join(", ")}. Export will include available sections only.
+                </p>
+              ) : null}
+              {exportWarning ? <p className="mt-3 rounded border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-sm text-[#9a3412]">{exportWarning}</p> : null}
+              {exportMessage ? <p className="mt-3 rounded border border-[#d9dee8] bg-[#fcfcfd] px-3 py-2 text-sm text-[#344054]">{exportMessage}</p> : null}
+            </Panel>
+          </section>
+
+          <section id="cold-dm-builder">
+            <Panel title="Cold DM Draft Builder">
+              <p className="text-sm text-[#667085]">Create outreach drafts from the job, resume fit, and application materials.</p>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <label className="text-sm font-medium text-[#344054]">
+                  Target
+                  <select
+                    value={coldDmTarget}
+                    onChange={(event) => {
+                      const value = event.target.value as ColdDmTargetType;
+                      setColdDmTarget(value);
+                      setColdDmLength(defaultColdDmLength(value));
+                    }}
+                    className="mt-1 w-full rounded border border-[#c8ced8] px-3 py-2 text-sm"
+                  >
+                    {coldDmTargetOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+                <label className="text-sm font-medium text-[#344054]">
+                  Tone
+                  <select value={coldDmTone} onChange={(event) => setColdDmTone(event.target.value as ColdDmTone)} className="mt-1 w-full rounded border border-[#c8ced8] px-3 py-2 text-sm">
+                    {coldDmToneOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+                <label className="text-sm font-medium text-[#344054]">
+                  Length
+                  <select value={coldDmLength} onChange={(event) => setColdDmLength(event.target.value as ColdDmLength)} className="mt-1 w-full rounded border border-[#c8ced8] px-3 py-2 text-sm">
+                    {coldDmLengthOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+              </div>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <label className="text-sm font-medium text-[#344054]">
+                  Recipient name
+                  <input value={recipientName} onChange={(event) => setRecipientName(event.target.value)} placeholder="Optional" className="mt-1 w-full rounded border border-[#c8ced8] px-3 py-2 text-sm" />
+                </label>
+                <label className="text-sm font-medium text-[#344054]">
+                  Custom ask
+                  <input value={customAsk} onChange={(event) => setCustomAsk(event.target.value)} placeholder="Would you be open to..." className="mt-1 w-full rounded border border-[#c8ced8] px-3 py-2 text-sm" />
+                </label>
+                <label className="text-sm font-medium text-[#344054] md:col-span-2">
+                  Company context
+                  <textarea value={companyContext} onChange={(event) => setCompanyContext(event.target.value)} rows={2} placeholder="Optional context you know is true." className="mt-1 w-full rounded border border-[#c8ced8] px-3 py-2 text-sm" />
+                </label>
+                <label className="text-sm font-medium text-[#344054] md:col-span-2">
+                  Custom proof point
+                  <textarea value={customProofPoint} onChange={(event) => setCustomProofPoint(event.target.value)} rows={2} placeholder="Optional project or resume proof point." className="mt-1 w-full rounded border border-[#c8ced8] px-3 py-2 text-sm" />
+                </label>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-3 text-sm text-[#344054]">
+                <Toggle checked={includeResumeFit} onChange={setIncludeResumeFit} label="Include resume fit" />
+                <Toggle checked={includeProjects} onChange={setIncludeProjects} label="Include project evidence" />
+                <Toggle checked={includeRemoteFit} onChange={setIncludeRemoteFit} label="Include remote fit" />
+                <Toggle checked={includeColdDmOutline} onChange={setIncludeColdDmOutline} label="Include packet cold DM outline" />
+                <Toggle checked={includeAsk} onChange={setIncludeAsk} label="Include direct ask" />
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button type="button" onClick={generateColdDmDraft} className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">
+                  Generate Draft
+                </button>
+                <button type="button" onClick={generateColdDmVariantDrafts} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
+                  Generate Variants
+                </button>
+                {selectedColdDmDraft ? (
+                  <button type="button" onClick={() => updateDecision("needs_cold_dm")} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
+                    Mark Needs Cold DM
+                  </button>
+                ) : null}
+              </div>
+              {coldDmMessage ? <p className="mt-3 rounded border border-[#d9dee8] bg-[#fcfcfd] px-3 py-2 text-sm text-[#344054]">{coldDmMessage}</p> : null}
+              {coldDmError ? <p className="mt-3 rounded border border-[#fecaca] bg-[#fff7f7] px-3 py-2 text-sm text-[#991b1b]">{coldDmError}</p> : null}
+              <div className="mt-4 grid gap-3">
+                {coldDmDrafts.map((draft) => (
+                  <ColdDmDraftCard
+                    key={draft.id}
+                    draft={draft}
+                    selected={draft.id === selectedColdDmDraftId}
+                    onSelect={() => setSelectedColdDmDraftId(draft.id)}
+                    onCopy={() => void copyDraft(draft)}
+                    onRegenerate={regenerateColdDmDraft}
+                    onSave={() => saveDraft(draft)}
+                    onTrackDrafted={() => trackDraft("drafted", draft)}
+                    onTrackCopied={() => trackDraft("copied", draft)}
+                    onMarkSent={markOutreachSent}
+                    onExport={() => {
+                      setSelectedColdDmDraftId(draft.id);
+                      document.getElementById("export-pack")?.scrollIntoView({ block: "start", behavior: "smooth" });
+                    }}
+                  />
+                ))}
+              </div>
+              <details className="mt-4">
+                <summary className="cursor-pointer text-sm font-medium text-[#175cd3]">View Saved Drafts for this Job ({savedDrafts.length})</summary>
+                <div className="mt-3 grid gap-3">
+                  {savedDrafts.length ? savedDrafts.map((draft) => (
+                    <SavedDraftCard
+                      key={draft.id}
+                      draft={draft}
+                      onCopy={() => void copyDraft(draft)}
+                      onDelete={() => deleteDraft(draft.id)}
+                    />
+                  )) : <p className="text-sm text-[#667085]">No saved drafts for this job yet.</p>}
+                </div>
+              </details>
+            </Panel>
+          </section>
 
           <Panel title="Resume Fit">
             {fit ? (
@@ -423,6 +707,51 @@ export function ApplicationActionCenter({
             <SectionError error={errors.decision} />
           </Panel>
 
+          <Panel title="Follow-up Tracking">
+            {followUps.length ? (
+              <div className="grid gap-3">
+                {followUps.map((item) => (
+                  <div key={item.id} className="rounded border border-[#e4e7ec] bg-[#fcfcfd] p-3">
+                    <div className="flex flex-wrap gap-2 text-xs text-[#475467]">
+                      <Badge>{labelize(item.outreach_type)}</Badge>
+                      <Badge>{labelize(item.outreach_status)}</Badge>
+                      {item.follow_up_due_at ? <Badge>Due {formatShortDate(item.follow_up_due_at)}</Badge> : null}
+                    </div>
+                    {item.draft_preview ? <p className="mt-2 text-sm text-[#344054]">{item.draft_preview}</p> : null}
+                    {item.notes ? <p className="mt-2 text-sm text-[#667085]">{item.notes}</p> : null}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button type="button" onClick={() => updateFollowUp(item.id, { outreach_status: "follow_up_sent", follow_up_sent_at: new Date().toISOString() }, "Marked follow-up sent.")} className="rounded border border-[#c8ced8] px-2.5 py-1.5 text-xs font-medium text-[#344054] hover:bg-white">Mark Follow-up Sent</button>
+                      <button type="button" onClick={() => updateFollowUp(item.id, { outreach_status: "responded" }, "Marked responded.")} className="rounded border border-[#c8ced8] px-2.5 py-1.5 text-xs font-medium text-[#344054] hover:bg-white">Mark Responded</button>
+                      <button type="button" onClick={() => updateFollowUp(item.id, { outreach_status: "closed" }, "Closed follow-up.")} className="rounded border border-[#c8ced8] px-2.5 py-1.5 text-xs font-medium text-[#344054] hover:bg-white">Close Follow-up</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-[#667085]">Not tracked yet.</p>
+            )}
+            <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+              <label className="text-sm font-medium text-[#344054]">
+                Follow-up date
+                <input type="datetime-local" value={followUpDueDate} onChange={(event) => setFollowUpDueDate(event.target.value)} className="mt-1 w-full rounded border border-[#c8ced8] px-3 py-2 text-sm" />
+              </label>
+              <button type="button" onClick={markOutreachSent} className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">
+                Mark Sent Manually
+              </button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" onClick={() => trackDraft("drafted")} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Track Draft</button>
+              <button type="button" onClick={() => trackDraft("copied")} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Mark Copied</button>
+              <button type="button" onClick={() => updateDecision("interested")} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Mark Interested</button>
+              <button type="button" onClick={() => updateDecision("needs_cold_dm")} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Mark Needs Cold DM</button>
+              <button type="button" onClick={() => updateDecision("applied")} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Mark Applied</button>
+              <Link href="/applications/follow-ups" className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Open Follow-up Tracker</Link>
+            </div>
+            <p className="mt-3 text-sm text-[#667085]">ScoutAI only tracks manual outreach here. It will not send or schedule messages.</p>
+            {followUpMessage ? <p className="mt-3 rounded border border-[#d9dee8] bg-[#fcfcfd] px-3 py-2 text-sm text-[#344054]">{followUpMessage}</p> : null}
+            {followUpError ? <p className="mt-3 rounded border border-[#fecaca] bg-[#fff7f7] px-3 py-2 text-sm text-[#991b1b]">{followUpError}</p> : null}
+          </Panel>
+
           <Panel title="Company Watch">
             <div className="mb-3 flex flex-wrap gap-2 text-xs text-[#475467]">
               <Badge>{watchlistItem ? "Watched" : reviewItem.company_watch_status ? "Watched" : "Not watched"}</Badge>
@@ -437,7 +766,9 @@ export function ApplicationActionCenter({
           <Panel title="Final Actions">
             <div className="flex flex-wrap gap-2">
               <Link href={`/jobs/${reviewItem.job_id}/workspace`} className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">Open Workspace</Link>
+              <Link href="/applications/command-center" className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Open Command Center</Link>
               <Link href="/jobs/pipeline" className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Open Pipeline</Link>
+              <Link href="/applications/follow-ups" className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Open Follow-up Tracker</Link>
               <Link href="/companies/watchlist" className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Open Company Watchlist</Link>
               <Link href="/discovery/control-center#review-queue" className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Back to Review Queue</Link>
             </div>
@@ -501,6 +832,113 @@ function EmptyText({ children }: { children: ReactNode }) {
 
 function Badge({ children }: { children: ReactNode }) {
   return <span className="rounded bg-white px-2 py-1 ring-1 ring-[#e4e7ec]">{children}</span>;
+}
+
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (value: boolean) => void; label: string }) {
+  return (
+    <label className="flex items-center gap-2">
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 accent-[#172033]" />
+      {label}
+    </label>
+  );
+}
+
+function ColdDmDraftCard({
+  draft,
+  selected,
+  onSelect,
+  onCopy,
+  onRegenerate,
+  onSave,
+  onTrackDrafted,
+  onTrackCopied,
+  onMarkSent,
+  onExport,
+}: {
+  draft: ColdDmDraftResult;
+  selected: boolean;
+  onSelect: () => void;
+  onCopy: () => void;
+  onRegenerate: () => void;
+  onSave: () => void;
+  onTrackDrafted: () => void;
+  onTrackCopied: () => void;
+  onMarkSent: () => void;
+  onExport: () => void;
+}) {
+  return (
+    <article className={`rounded border p-3 ${selected ? "border-[#93c5fd] bg-[#eff6ff]" : "border-[#e4e7ec] bg-[#fcfcfd]"}`}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h4 className="text-sm font-semibold text-[#171923]">{draft.title}</h4>
+          <p className="mt-1 text-xs text-[#667085]">{draft.wordCount} words / {draft.characterCount} characters</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={onSelect} className="rounded border border-[#c8ced8] px-2.5 py-1.5 text-xs font-medium text-[#344054] hover:bg-white">
+            Select
+          </button>
+          <button type="button" onClick={onCopy} className="rounded border border-[#c8ced8] px-2.5 py-1.5 text-xs font-medium text-[#344054] hover:bg-white">
+            Copy Draft
+          </button>
+          <button type="button" onClick={onRegenerate} className="rounded border border-[#c8ced8] px-2.5 py-1.5 text-xs font-medium text-[#344054] hover:bg-white">
+            Regenerate
+          </button>
+          <button type="button" onClick={onSave} className="rounded bg-[#172033] px-2.5 py-1.5 text-xs font-medium text-white hover:bg-[#0f1728]">
+            Save Draft Locally
+          </button>
+          <button type="button" onClick={onTrackDrafted} className="rounded border border-[#c8ced8] px-2.5 py-1.5 text-xs font-medium text-[#344054] hover:bg-white">
+            Track as Drafted
+          </button>
+          <button type="button" onClick={onTrackCopied} className="rounded border border-[#c8ced8] px-2.5 py-1.5 text-xs font-medium text-[#344054] hover:bg-white">
+            Track as Copied
+          </button>
+          <button type="button" onClick={onMarkSent} className="rounded border border-[#c8ced8] px-2.5 py-1.5 text-xs font-medium text-[#344054] hover:bg-white">
+            Mark as Manually Sent
+          </button>
+          <button type="button" onClick={onExport} className="rounded border border-[#c8ced8] px-2.5 py-1.5 text-xs font-medium text-[#344054] hover:bg-white">
+            Export with Application Pack
+          </button>
+        </div>
+      </div>
+      {draft.subjectLine ? <p className="mt-3 text-sm font-medium text-[#344054]">Subject: {draft.subjectLine}</p> : null}
+      <pre className="mt-3 whitespace-pre-wrap rounded bg-white p-3 text-sm leading-6 text-[#344054] ring-1 ring-[#e4e7ec]">{draft.body}</pre>
+      {draft.warnings.length ? (
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[#9a3412]">
+          {draft.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+        </ul>
+      ) : null}
+    </article>
+  );
+}
+
+function SavedDraftCard({
+  draft,
+  onCopy,
+  onDelete,
+}: {
+  draft: SavedColdDmDraft;
+  onCopy: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <article className="rounded border border-[#e4e7ec] bg-[#fcfcfd] p-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h4 className="text-sm font-semibold text-[#171923]">{draft.title ?? "Saved cold DM draft"}</h4>
+          <p className="mt-1 text-xs text-[#667085]">{labelize(draft.targetType)} / {labelize(draft.tone)} / saved {formatShortDate(draft.generatedAt)}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={onCopy} className="rounded border border-[#c8ced8] px-2.5 py-1.5 text-xs font-medium text-[#344054] hover:bg-white">
+            Copy
+          </button>
+          <button type="button" onClick={onDelete} className="rounded border border-[#fecaca] px-2.5 py-1.5 text-xs font-medium text-[#991b1b] hover:bg-[#fff7f7]">
+            Delete
+          </button>
+        </div>
+      </div>
+      <pre className="mt-3 whitespace-pre-wrap rounded bg-white p-3 text-sm leading-6 text-[#344054] ring-1 ring-[#e4e7ec]">{draft.body}</pre>
+    </article>
+  );
 }
 
 function ResumeFitBlock({ fit }: { fit: ResumeFitResult }) {
@@ -568,6 +1006,12 @@ function juniorSignal(title?: string | null) {
 
 function labelize(value?: string | null) {
   return (value ?? "unknown").replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatShortDate(value?: string | null) {
+  if (!value) return "unknown";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
 }
 
 function friendlyError(error: unknown) {

@@ -10,6 +10,8 @@ const navigation = [
   { name: "Jobs", href: "/jobs", icon: "J" },
   { name: "Tracked Jobs", href: "/jobs/tracked", icon: "T" },
   { name: "Pipeline", href: "/jobs/pipeline", icon: "B" },
+  { name: "Command Center", href: "/applications/command-center", icon: "K" },
+  { name: "Follow-ups", href: "/applications/follow-ups", icon: "U" },
   { name: "Recommendations", href: "/recommendations", icon: "R" },
   { name: "Discovery", href: "/discovery/control-center", icon: "F" },
   { name: "Outreach", href: "/outreach", icon: "O" },

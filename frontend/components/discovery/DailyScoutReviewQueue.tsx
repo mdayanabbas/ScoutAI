@@ -110,6 +110,7 @@ export function DailyScoutReviewQueue({
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [actionCenterItem, setActionCenterItem] = useState<DailyScoutReviewItem | null>(null);
+  const [actionCenterInitialSection, setActionCenterInitialSection] = useState<"cold_dm" | "export" | undefined>();
 
   const sources = useMemo(
     () => Array.from(new Set(items.map((item) => item.source_name ?? item.source_platform).filter(Boolean) as string[])).sort(),
@@ -301,7 +302,14 @@ export function DailyScoutReviewQueue({
             onWatchCompany={onWatchCompany}
             onOpenedWorkspace={onOpenedWorkspace}
             onCopyJobUrl={onCopyJobUrl}
-            onOpenActionCenter={setActionCenterItem}
+            onOpenActionCenter={(selected) => {
+              setActionCenterInitialSection(undefined);
+              setActionCenterItem(selected);
+            }}
+            onOpenColdDm={(selected) => {
+              setActionCenterInitialSection("cold_dm");
+              setActionCenterItem(selected);
+            }}
           />
         ))}
       </div>
@@ -311,6 +319,7 @@ export function DailyScoutReviewQueue({
           reviewItem={actionCenterItem}
           activeResume={activeResume}
           existingDecision={actionCenterItem.decision ?? null}
+          initialSection={actionCenterInitialSection}
           resumeFitResult={
             actionCenterItem.resume_analysis_status
               ? {
@@ -349,7 +358,10 @@ export function DailyScoutReviewQueue({
             onActionCenterResumeFitUpdated(actionCenterItem, result);
             setActionCenterItem((current) => current ? { ...current, ...result } : current);
           }}
-          onClose={() => setActionCenterItem(null)}
+          onClose={() => {
+            setActionCenterItem(null);
+            setActionCenterInitialSection(undefined);
+          }}
         />
       ) : null}
     </section>
@@ -453,6 +465,7 @@ function DailyScoutReviewCard({
   onOpenedWorkspace,
   onCopyJobUrl,
   onOpenActionCenter,
+  onOpenColdDm,
 }: {
   item: DailyScoutReviewItem;
   selected: boolean;
@@ -462,6 +475,7 @@ function DailyScoutReviewCard({
   onOpenedWorkspace: (item: DailyScoutReviewItem) => void;
   onCopyJobUrl: (item: DailyScoutReviewItem) => void;
   onOpenActionCenter: (item: DailyScoutReviewItem) => void;
+  onOpenColdDm: (item: DailyScoutReviewItem) => void;
 }) {
   const external = normalizeExternalUrl(item.apply_url) ?? normalizeExternalUrl(item.job_url);
   const salary = formatSalary({
@@ -509,6 +523,13 @@ function DailyScoutReviewCard({
             className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]"
           >
             Action Center
+          </button>
+          <button
+            type="button"
+            onClick={() => onOpenColdDm(item)}
+            className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
+          >
+            Cold DM
           </button>
           {item.resume_action ? <ResumePrimaryAction item={item} onDecisionAction={onDecisionAction} /> : null}
           {decisionActions.map((action) => (
