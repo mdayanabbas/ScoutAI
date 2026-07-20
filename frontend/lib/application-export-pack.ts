@@ -1,5 +1,6 @@
 import { formatMatchTier, formatRemoteEligibility, formatSalary, normalizeExternalUrl } from "@/components/recommendations/recommendation-format";
 import type { DailyScoutReviewItem } from "@/lib/daily-scout-review-queue";
+import type { ColdDmDraftResult, SavedColdDmDraft } from "@/lib/cold-dm-draft";
 import type { ResumeFitResult } from "@/lib/resume-aware-review-ranking";
 import type { ApplicationPacketResponse } from "@/types/application-packet";
 import type { ApplicationPrepResponse } from "@/types/application-prep";
@@ -19,6 +20,7 @@ export type ApplicationExportInput = {
   prepNotes?: ApplicationPrepResponse | null;
   decision?: JobApplicationDecisionResponse | null;
   watchlistItem?: CompanyWatchlistResponse | null;
+  coldDmDrafts?: Array<ColdDmDraftResult | SavedColdDmDraft> | null;
   generatedAt?: Date;
   nextAction?: string | null;
 };
@@ -104,6 +106,7 @@ export function buildApplicationExportMarkdown(input: ApplicationExportInput) {
   addListSection(lines, "## Project Evidence", packet?.project_evidence_to_use ?? prep?.project_talking_points);
   addListSection(lines, "## Cover Note Outline", packet?.cover_note_outline?.items);
   addListSection(lines, "## Cold DM Outline", packet?.cold_dm_outline?.items ?? prep?.cold_dm_angle);
+  addColdDmDrafts(lines, input.coldDmDrafts);
 
   if (prepHasContent(prep)) {
     lines.push("## Prep Notes");
@@ -257,6 +260,20 @@ function addChecklistSection(lines: string[], title: string, items: unknown) {
   lines.push(title);
   lines.push(...values.map((item) => `- [ ] ${item}`));
   lines.push("");
+}
+
+function addColdDmDrafts(lines: string[], drafts?: Array<ColdDmDraftResult | SavedColdDmDraft> | null) {
+  const valid = (drafts ?? []).filter((draft) => cleanBlock(draft.body));
+  if (!valid.length) return;
+  lines.push("## Cold DM Drafts");
+  for (const draft of valid) {
+    const title = cleanInline(draft.title) || `${cleanInline(draft.targetType)} draft`;
+    lines.push(`### ${title}`);
+    if (cleanInline(draft.subjectLine)) lines.push(`Subject: ${cleanInline(draft.subjectLine)}`);
+    lines.push("");
+    lines.push(cleanBlock(draft.body));
+    lines.push("");
+  }
 }
 
 function addSubList(lines: string[], title: string, items: unknown) {

@@ -262,6 +262,12 @@ export default function JobWorkspacePage() {
             >
               Discovery Control
             </Link>
+            <Link
+              href="/applications/follow-ups"
+              className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
+            >
+              Follow-ups
+            </Link>
             <button
               type="button"
               onClick={copyMarkdown}
