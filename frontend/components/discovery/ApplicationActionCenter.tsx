@@ -766,6 +766,7 @@ export function ApplicationActionCenter({
           <Panel title="Final Actions">
             <div className="flex flex-wrap gap-2">
               <Link href={`/jobs/${reviewItem.job_id}/workspace`} className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">Open Workspace</Link>
+              <Link href="/applications/command-center" className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Open Command Center</Link>
               <Link href="/jobs/pipeline" className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Open Pipeline</Link>
               <Link href="/applications/follow-ups" className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Open Follow-up Tracker</Link>
               <Link href="/companies/watchlist" className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Open Company Watchlist</Link>

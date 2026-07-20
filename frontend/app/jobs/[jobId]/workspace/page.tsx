@@ -257,6 +257,12 @@ export default function JobWorkspacePage() {
               Application Pipeline
             </Link>
             <Link
+              href="/applications/command-center"
+              className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
+            >
+              Command Center
+            </Link>
+            <Link
               href="/discovery/control-center"
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
