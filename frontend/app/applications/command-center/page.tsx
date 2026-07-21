@@ -183,6 +183,7 @@ export default function ApplicationCommandCenterPage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <Link href="/discovery/control-center" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Discovery Control</Link>
+            <Link href="/applications/analytics" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Analytics</Link>
             <Link href="/applications/follow-ups" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Follow-ups</Link>
             <Link href="/jobs/pipeline" className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">Pipeline</Link>
           </div>
@@ -416,6 +417,7 @@ function DailyOperatingLoopSummary({ model }: { model: DailyOperatingLoopModel }
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={copySummary} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-white">Copy Summary</button>
           <button type="button" onClick={downloadSummary} className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">Download Markdown Summary</button>
+          <Link href="/applications/analytics" className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-white">Open Analytics</Link>
         </div>
       </div>
       {copyMessage ? <p className="mt-3 text-sm text-[#175cd3]">{copyMessage}</p> : null}

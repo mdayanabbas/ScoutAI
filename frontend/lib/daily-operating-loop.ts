@@ -82,6 +82,7 @@ const stepOrder: DailyOperatingLoopStepId[] = [
 ];
 
 export const dailyOperatingLoopStorage = {
+  getAllLoops,
   getTodayLoop,
   saveTodayLoop,
   updateTodayLoop,
@@ -111,6 +112,10 @@ export function createDailyLoop(date = localDateKey()): DailyOperatingLoopState 
     counters: {},
     lastUpdatedAt: now,
   };
+}
+
+export function getAllLoops() {
+  return Object.values(readLoops()).sort((a, b) => String(b.date).localeCompare(String(a.date)));
 }
 
 export function getTodayLoop(date = localDateKey()) {

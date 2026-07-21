@@ -178,6 +178,12 @@ export default function ApplicationPipelinePage() {
               Pipeline Analytics
             </Link>
             <Link
+              href="/applications/analytics"
+              className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
+            >
+              Job Search Analytics
+            </Link>
+            <Link
               href="/jobs/tracked"
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
