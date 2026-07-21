@@ -12,6 +12,17 @@ import {
   type CommandCenterAction,
   type CommandCenterTask,
 } from "@/lib/application-command-center";
+import {
+  buildDailyOperatingLoopMarkdown,
+  buildDailyOperatingLoopModel,
+  createDailyLoop,
+  dailyOperatingLoopStorage,
+  localDateKey,
+  type DailyOperatingLoopModel,
+  type DailyOperatingLoopState,
+  type DailyOperatingLoopStep,
+  type DailyOperatingLoopStepId,
+} from "@/lib/daily-operating-loop";
 import { getSavedColdDmDrafts } from "@/lib/cold-dm-draft";
 import { fetchCompanyWatchlist, fetchCompanyWatchlistStats } from "@/lib/company-watchlist-api";
 import { fetchDiscoveryRuns } from "@/lib/discovery-api";
@@ -40,6 +51,9 @@ export default function ApplicationCommandCenterPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingJobId, setPendingJobId] = useState<string | null>(null);
+  const today = localDateKey();
+  const [loopState, setLoopState] = useState<DailyOperatingLoopState | null>(() => dailyOperatingLoopStorage.getTodayLoop(today));
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const decisionsQuery = useQuery({ queryKey: ["command-center", "decisions"], queryFn: () => listJobDecisions({ limit: 100, include_archived: true }), retry: 1 });
   const countsQuery = useQuery({ queryKey: ["command-center", "decision-counts"], queryFn: getJobDecisionStatusCounts, retry: 1 });
   const recommendedQuery = useQuery({ queryKey: ["command-center", "recommended"], queryFn: () => fetchRecommendedJobMatches({ order_by: "recommended", limit: 50 }), retry: 1 });
@@ -74,6 +88,62 @@ export default function ApplicationCommandCenterPage() {
     watchlistQuery.error ? "Company watchlist unavailable." : null,
     discoveryRunsQuery.error ? "Discovery runs unavailable." : null,
   ].filter(Boolean) as string[];
+  const loopModel = useMemo(() => buildDailyOperatingLoopModel(model, loopState, new Date()), [loopState, model]);
+
+  function refreshLoop(note?: string) {
+    setLoopState(dailyOperatingLoopStorage.getTodayLoop(today));
+    if (note) setMessage(note);
+  }
+
+  function startLoop() {
+    const result = dailyOperatingLoopStorage.saveTodayLoop(createDailyLoop(today));
+    setLoopState(result.loop);
+    setSummaryOpen(false);
+    setMessage(result.ok ? "Started today's daily operating loop." : result.error ?? "Could not start daily loop.");
+  }
+
+  function resumeLoop() {
+    if (!loopState) {
+      startLoop();
+      return;
+    }
+    setMessage("Resumed today's daily operating loop.");
+    window.setTimeout(() => document.getElementById("daily-loop")?.scrollIntoView({ block: "start", behavior: "smooth" }), 0);
+  }
+
+  function resetLoop() {
+    if (!window.confirm("Reset today's daily operating loop? Completed and skipped steps for today will be cleared.")) return;
+    const result = dailyOperatingLoopStorage.resetTodayLoop(today);
+    setLoopState(null);
+    setSummaryOpen(false);
+    setMessage(result.ok ? "Reset today's loop." : result.error ?? "Could not reset daily loop.");
+  }
+
+  function completeLoop() {
+    const result = dailyOperatingLoopStorage.completeTodayLoop(today);
+    setLoopState(result.loop);
+    setSummaryOpen(true);
+    setMessage(result.ok ? "Completed today's loop." : result.error ?? "Could not complete daily loop.");
+  }
+
+  function markLoopStepComplete(stepId: DailyOperatingLoopStepId) {
+    const result = dailyOperatingLoopStorage.markStepComplete(today, stepId);
+    setLoopState(result.loop);
+    if (stepId === "daily_summary") setSummaryOpen(true);
+    setMessage(result.ok ? "Step marked complete." : result.error ?? "Could not update daily loop.");
+  }
+
+  function skipLoopStep(stepId: DailyOperatingLoopStepId) {
+    const result = dailyOperatingLoopStorage.markStepSkipped(today, stepId);
+    setLoopState(result.loop);
+    setMessage(result.ok ? "Step skipped for today." : result.error ?? "Could not update daily loop.");
+  }
+
+  function saveLoopNotes(notes: string) {
+    const result = dailyOperatingLoopStorage.updateTodayLoop(today, { notes });
+    setLoopState(result.loop);
+    if (!result.ok) setMessage(result.error ?? "Could not save notes.");
+  }
 
   async function updateReviewDecision(job: RecommendedJobMatch, status: JobDecisionStatus) {
     setPendingJobId(job.job_id);
@@ -124,6 +194,19 @@ export default function ApplicationCommandCenterPage() {
       {queryErrors.length ? <Notice tone="warning">{`Partial dashboard: ${queryErrors.join(" ")}`}</Notice> : null}
       {model.warnings.map((warning) => <Notice key={warning} tone="warning">{warning}</Notice>)}
 
+      <DailyOperatingLoopPanel
+        model={loopModel}
+        summaryOpen={summaryOpen || loopModel.state.status === "completed"}
+        onStart={startLoop}
+        onResume={resumeLoop}
+        onReset={resetLoop}
+        onCompleteDay={completeLoop}
+        onCompleteStep={markLoopStepComplete}
+        onSkipStep={skipLoopStep}
+        onSaveNotes={saveLoopNotes}
+        onViewSummary={() => setSummaryOpen((current) => !current)}
+      />
+
       <SummaryGrid model={model} />
       <FilterTabs active={filter} onChange={setFilter} />
 
@@ -150,7 +233,7 @@ export default function ApplicationCommandCenterPage() {
         />
       ) : null}
 
-      {(filter === "resume" || filter === "needs_action") ? <TaskSection title="Resume Tasks" tasks={model.resumeTasks} empty="No resume tasks right now." /> : null}
+      {(filter === "resume" || filter === "needs_action") ? <TaskSection id="resume-tasks" title="Resume Tasks" tasks={model.resumeTasks} empty="No resume tasks right now." /> : null}
       {(filter === "cold_dm" || filter === "needs_action") ? <ColdDmSection tasks={model.coldDmTasks} /> : null}
       {(filter === "follow_up" || filter === "needs_action") ? <FollowUpSection tasks={model.followUpTasks} /> : null}
       {(filter === "applications" || filter === "today") ? (
@@ -180,6 +263,167 @@ function SummaryGrid({ model }: { model: ApplicationCommandCenterModel }) {
   );
 }
 
+function DailyOperatingLoopPanel({
+  model,
+  summaryOpen,
+  onStart,
+  onResume,
+  onReset,
+  onCompleteDay,
+  onCompleteStep,
+  onSkipStep,
+  onSaveNotes,
+  onViewSummary,
+}: {
+  model: DailyOperatingLoopModel;
+  summaryOpen: boolean;
+  onStart: () => void;
+  onResume: () => void;
+  onReset: () => void;
+  onCompleteDay: () => void;
+  onCompleteStep: (stepId: DailyOperatingLoopStepId) => void;
+  onSkipStep: (stepId: DailyOperatingLoopStepId) => void;
+  onSaveNotes: (notes: string) => void;
+  onViewSummary: () => void;
+}) {
+  const [notes, setNotes] = useState(model.state.notes ?? "");
+  const current = model.currentStep;
+  return (
+    <section id="daily-loop" className="mb-5 rounded-md border border-[#d9dee8] bg-white p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-[#171923]">Daily Operating Loop</h2>
+          <p className="mt-1 text-sm text-[#667085]">Walk through today's job-search actions in the right order.</p>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs text-[#475467]">
+            <Badge>{labelize(model.state.status)}</Badge>
+            <Badge>{`${model.progress.completed} completed`}</Badge>
+            <Badge>{`${model.progress.skipped} skipped`}</Badge>
+            <Badge>{`${model.progress.percent}% done`}</Badge>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={onStart} className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">Start Today</button>
+          <button type="button" onClick={onResume} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Resume Loop</button>
+          <button type="button" onClick={onReset} className="rounded border border-[#fecaca] px-3 py-2 text-sm font-medium text-[#991b1b] hover:bg-[#fff7f7]">Reset Today</button>
+          <button type="button" onClick={onViewSummary} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">View Daily Summary</button>
+        </div>
+      </div>
+
+      <div className="mt-5 h-2 overflow-hidden rounded bg-[#eef2f6]">
+        <div className="h-full bg-[#172033]" style={{ width: `${model.progress.percent}%` }} />
+      </div>
+
+      <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="rounded border border-[#e4e7ec] bg-[#fcfcfd] p-4">
+          <p className="text-xs font-medium uppercase tracking-normal text-[#667085]">Current step</p>
+          <h3 className="mt-2 text-base font-semibold text-[#171923]">{current.title}</h3>
+          <p className="mt-1 text-sm leading-6 text-[#475467]">{current.description}</p>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs text-[#475467]">
+            <Badge>{labelize(current.priority)}</Badge>
+            <Badge>{current.estimatedAction}</Badge>
+            <Badge>{current.isRequired ? "Required" : "Optional"}</Badge>
+          </div>
+          <p className="mt-3 text-sm text-[#667085]">{current.completionRule}</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href={current.href} className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">{current.primaryActionLabel}</Link>
+            <button type="button" onClick={() => onCompleteStep(current.id)} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Mark Complete</button>
+            <button type="button" onClick={() => onSkipStep(current.id)} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Skip Step</button>
+            {current.id === "daily_summary" ? <button type="button" onClick={onCompleteDay} className="rounded border border-[#bbf7d0] px-3 py-2 text-sm font-medium text-[#166534] hover:bg-[#f0fdf4]">Complete Day</button> : null}
+          </div>
+          {model.warnings.map((warning) => <p key={warning} className="mt-3 rounded border border-[#fed7aa] bg-[#fff7ed] px-3 py-2 text-sm text-[#9a3412]">{warning}</p>)}
+        </div>
+
+        <div className="rounded border border-[#e4e7ec] bg-[#fcfcfd] p-4">
+          <p className="text-xs font-medium uppercase tracking-normal text-[#667085]">Loop notes</p>
+          <textarea
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            onBlur={() => onSaveNotes(notes)}
+            rows={7}
+            className="mt-2 w-full rounded border border-[#c8ced8] px-3 py-2 text-sm text-[#344054]"
+            placeholder="What moved today? What should tomorrow-you remember?"
+          />
+          <button type="button" onClick={() => onSaveNotes(notes)} className="mt-2 rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-white">Save Notes</button>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-2 md:grid-cols-3">
+        {model.steps.map((step) => (
+          <DailyLoopStepCard key={step.id} step={step} onComplete={() => onCompleteStep(step.id)} onSkip={() => onSkipStep(step.id)} />
+        ))}
+      </div>
+
+      {summaryOpen ? <DailyOperatingLoopSummary model={model} /> : null}
+    </section>
+  );
+}
+
+function DailyLoopStepCard({ step, onComplete, onSkip }: { step: DailyOperatingLoopStep; onComplete: () => void; onSkip: () => void }) {
+  const tone = step.status === "completed" ? "border-[#bbf7d0] bg-[#f0fdf4]" : step.status === "skipped" ? "border-[#e4e7ec] bg-[#f8fafc]" : step.status === "current" ? "border-[#93c5fd] bg-[#eff6ff]" : "border-[#e4e7ec] bg-white";
+  return (
+    <article className={`rounded border p-3 ${tone}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-normal text-[#667085]">{labelize(step.status)}</p>
+          <h3 className="mt-1 text-sm font-semibold text-[#171923]">{step.title}</h3>
+        </div>
+        <span className="rounded bg-white px-2 py-1 text-xs text-[#475467]">{step.count}</span>
+      </div>
+      <p className="mt-2 line-clamp-3 text-sm text-[#667085]">{step.description}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link href={step.href} className="text-sm font-medium text-[#175cd3]">{step.primaryActionLabel}</Link>
+        {step.status !== "completed" ? <button type="button" onClick={onComplete} className="text-sm font-medium text-[#166534]">Complete</button> : null}
+        {step.status !== "skipped" && !step.isRequired ? <button type="button" onClick={onSkip} className="text-sm font-medium text-[#667085]">Skip</button> : null}
+      </div>
+    </article>
+  );
+}
+
+function DailyOperatingLoopSummary({ model }: { model: DailyOperatingLoopModel }) {
+  const [copyMessage, setCopyMessage] = useState<string | null>(null);
+  const markdown = buildDailyOperatingLoopMarkdown(model);
+  async function copySummary() {
+    try {
+      await navigator.clipboard.writeText(markdown);
+      setCopyMessage("Copied daily summary.");
+    } catch {
+      setCopyMessage("Could not copy daily summary.");
+    }
+  }
+  function downloadSummary() {
+    try {
+      const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `scoutai-daily-summary-${model.date}.md`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      setCopyMessage("Downloaded daily summary.");
+    } catch {
+      setCopyMessage("Could not download daily summary.");
+    }
+  }
+  return (
+    <section id="daily-summary" className="mt-5 rounded border border-[#d9dee8] bg-[#fcfcfd] p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-base font-semibold text-[#171923]">Daily Summary</h3>
+          <p className="mt-1 text-sm text-[#667085]">Export today&apos;s job-search loop as Markdown.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={copySummary} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-white">Copy Summary</button>
+          <button type="button" onClick={downloadSummary} className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">Download Markdown Summary</button>
+        </div>
+      </div>
+      {copyMessage ? <p className="mt-3 text-sm text-[#175cd3]">{copyMessage}</p> : null}
+      <pre className="mt-4 max-h-96 overflow-auto whitespace-pre-wrap rounded bg-white p-3 text-sm leading-6 text-[#344054] ring-1 ring-[#e4e7ec]">{markdown}</pre>
+    </section>
+  );
+}
+
 function JobsToReviewSection({
   jobs,
   decisions,
@@ -194,7 +438,7 @@ function JobsToReviewSection({
   const decisionIds = new Set(decisions.map((decision) => decision.job_id));
   const unreviewed = jobs.filter((job) => !decisionIds.has(job.job_id)).slice(0, 8);
   return (
-    <section className="mb-5 rounded-md border border-[#d9dee8] bg-white p-5">
+    <section id="jobs-to-review" className="mb-5 rounded-md border border-[#d9dee8] bg-white p-5">
       <SectionHeader title="Jobs to Review" href="/recommendations" />
       {!unreviewed.length ? <Empty text="No saved-job review tasks. Review recommendations or run Daily Scout." /> : (
         <div className="grid gap-3">
@@ -227,9 +471,9 @@ function JobsToReviewSection({
   );
 }
 
-function TaskSection({ title, tasks, empty, actionHref }: { title: string; tasks: CommandCenterTask[]; empty: string; actionHref?: string }) {
+function TaskSection({ id, title, tasks, empty, actionHref }: { id?: string; title: string; tasks: CommandCenterTask[]; empty: string; actionHref?: string }) {
   return (
-    <section className="mb-5 rounded-md border border-[#d9dee8] bg-white p-5">
+    <section id={id} className="mb-5 rounded-md border border-[#d9dee8] bg-white p-5">
       <SectionHeader title={title} href={actionHref} />
       {!tasks.length ? <Empty text={empty} /> : <div className="grid gap-3">{tasks.map((task) => <TaskCard key={task.id} task={task} />)}</div>}
     </section>
@@ -238,13 +482,13 @@ function TaskSection({ title, tasks, empty, actionHref }: { title: string; tasks
 
 function ColdDmSection({ tasks }: { tasks: CommandCenterTask[] }) {
   return (
-    <TaskSection title="Cold DM Tasks" tasks={tasks} empty="No cold DM tasks right now." actionHref="/applications/follow-ups" />
+    <TaskSection id="cold-dm-tasks" title="Cold DM Tasks" tasks={tasks} empty="No cold DM tasks right now." actionHref="/applications/follow-ups" />
   );
 }
 
 function FollowUpSection({ tasks }: { tasks: CommandCenterTask[] }) {
   return (
-    <TaskSection title="Follow-ups" tasks={tasks} empty="No follow-ups tracked yet." actionHref="/applications/follow-ups" />
+    <TaskSection id="follow-ups" title="Follow-ups" tasks={tasks} empty="No follow-ups tracked yet." actionHref="/applications/follow-ups" />
   );
 }
 
