@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/layout/PageHeader";
+import { APP_ROUTES } from "@/lib/app-routes";
 import {
   applicationFollowUpStorage,
   buildFollowUpDashboard,
@@ -89,10 +90,10 @@ export default function ApplicationFollowUpsPage() {
         description="Track manually sent outreach and follow-ups across your job search."
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link href="/discovery/control-center" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Discovery Control</Link>
-            <Link href="/applications/command-center" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Command Center</Link>
-            <Link href="/applications/analytics" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Analytics</Link>
-            <Link href="/jobs/pipeline" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Pipeline</Link>
+            <Link href={APP_ROUTES.discovery} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Discovery Control</Link>
+            <Link href={APP_ROUTES.commandCenter} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Command Center</Link>
+            <Link href={APP_ROUTES.analytics} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Analytics</Link>
+            <Link href={APP_ROUTES.pipeline} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Pipeline</Link>
             <button type="button" onClick={() => setCreating(true)} className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">Add Manual Follow-up</button>
           </div>
         }

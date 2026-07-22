@@ -5,7 +5,9 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { PageHeader } from "@/components/layout/PageHeader";
+import { LoadingState } from "@/components/ui/AppState";
 import { applicationFollowUpStorage } from "@/lib/application-follow-ups";
+import { APP_ROUTES } from "@/lib/app-routes";
 import { getSavedColdDmDrafts } from "@/lib/cold-dm-draft";
 import { fetchCompanyWatchlist, fetchCompanyWatchlistStats } from "@/lib/company-watchlist-api";
 import { dailyOperatingLoopStorage } from "@/lib/daily-operating-loop";
@@ -91,6 +93,12 @@ export default function JobSearchAnalyticsPage() {
     watchlistQuery.error ? "Company watchlist unavailable." : null,
     activeResumeQuery.error ? "Active resume unavailable." : null,
   ].filter(Boolean) as string[];
+  const loadingSections =
+    decisionsQuery.isLoading ||
+    recommendedQuery.isLoading ||
+    discoveryRunsQuery.isLoading ||
+    watchlistQuery.isLoading ||
+    activeResumeQuery.isLoading;
 
   const noData =
     model.summary.totalJobsTracked === 0 &&
@@ -134,15 +142,16 @@ export default function JobSearchAnalyticsPage() {
         description="Track your job-search funnel, outreach activity, source quality, and weekly progress."
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link href="/applications/command-center" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Command Center</Link>
-            <Link href="/jobs/pipeline" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Pipeline</Link>
-            <Link href="/discovery/control-center" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Discovery Control</Link>
-            <Link href="/applications/follow-ups" className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">Follow-ups</Link>
+            <Link href={APP_ROUTES.commandCenter} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Command Center</Link>
+            <Link href={APP_ROUTES.pipeline} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Pipeline</Link>
+            <Link href={APP_ROUTES.discovery} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Discovery Control</Link>
+            <Link href={APP_ROUTES.followUps} className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">Follow-ups</Link>
           </div>
         }
       />
 
       {message ? <Notice>{message}</Notice> : null}
+      {loadingSections ? <div className="mb-4"><LoadingState message="Loading job-search analytics..." /></div> : null}
       {queryWarnings.length ? <Notice tone="warning">{`Partial analytics: ${queryWarnings.join(" ")}`}</Notice> : null}
       {model.warnings.map((warning) => <Notice key={warning} tone="warning">{warning}</Notice>)}
 
@@ -172,8 +181,8 @@ export default function JobSearchAnalyticsPage() {
           <h2 className="text-base font-semibold text-[#171923]">No job-search analytics yet.</h2>
           <p className="mx-auto mt-2 max-w-2xl text-sm text-[#667085]">Run Daily Scout and start reviewing jobs to generate metrics.</p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
-            <Link href="/discovery/control-center" className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white">Open Discovery Control Center</Link>
-            <Link href="/applications/command-center" className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054]">Open Command Center</Link>
+            <Link href={APP_ROUTES.discovery} className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white">Open Discovery Control Center</Link>
+            <Link href={APP_ROUTES.commandCenter} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054]">Open Command Center</Link>
           </div>
         </section>
       ) : (

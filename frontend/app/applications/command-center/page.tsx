@@ -5,7 +5,9 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { PageHeader } from "@/components/layout/PageHeader";
+import { LoadingState } from "@/components/ui/AppState";
 import { applicationFollowUpStorage } from "@/lib/application-follow-ups";
+import { APP_ROUTES } from "@/lib/app-routes";
 import {
   buildApplicationCommandCenterModel,
   type ApplicationCommandCenterModel,
@@ -88,6 +90,12 @@ export default function ApplicationCommandCenterPage() {
     watchlistQuery.error ? "Company watchlist unavailable." : null,
     discoveryRunsQuery.error ? "Discovery runs unavailable." : null,
   ].filter(Boolean) as string[];
+  const loadingSections =
+    decisionsQuery.isLoading ||
+    recommendedQuery.isLoading ||
+    resumeQuery.isLoading ||
+    watchlistQuery.isLoading ||
+    discoveryRunsQuery.isLoading;
   const loopModel = useMemo(() => buildDailyOperatingLoopModel(model, loopState, new Date()), [loopState, model]);
 
   function refreshLoop(note?: string) {
@@ -182,14 +190,16 @@ export default function ApplicationCommandCenterPage() {
         description="Your daily job-search control room for reviews, follow-ups, resume tasks, outreach, and applications."
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link href="/discovery/control-center" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Discovery Control</Link>
-            <Link href="/applications/analytics" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Analytics</Link>
-            <Link href="/applications/follow-ups" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Follow-ups</Link>
-            <Link href="/jobs/pipeline" className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">Pipeline</Link>
+            <Link href={APP_ROUTES.discovery} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Discovery Control</Link>
+            <Link href={APP_ROUTES.analytics} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Analytics</Link>
+            <Link href={APP_ROUTES.followUps} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Follow-ups</Link>
+            <Link href={APP_ROUTES.companyWatchlist} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Watchlist</Link>
+            <Link href={APP_ROUTES.pipeline} className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">Pipeline</Link>
           </div>
         }
       />
 
+      {loadingSections ? <div className="mb-4"><LoadingState message="Loading your job-search command center..." /></div> : null}
       {message ? <Notice>{message}</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       {queryErrors.length ? <Notice tone="warning">{`Partial dashboard: ${queryErrors.join(" ")}`}</Notice> : null}
@@ -213,14 +223,14 @@ export default function ApplicationCommandCenterPage() {
 
       {(filter === "today" || filter === "needs_action") ? (
         <section className="mb-5 rounded-md border border-[#d9dee8] bg-white p-5">
-          <SectionHeader title="Today's Priorities" href="/applications/follow-ups" />
+          <SectionHeader title="Today's Priorities" href={APP_ROUTES.followUps} />
           <ActionList actions={model.todayPriorities} />
         </section>
       ) : null}
 
       {(filter === "today" || filter === "needs_action") ? (
         <section className="mb-5 rounded-md border border-[#d9dee8] bg-white p-5">
-          <SectionHeader title="Next Best Actions" href="/discovery/control-center" />
+          <SectionHeader title="Next Best Actions" href={APP_ROUTES.discovery} />
           <ActionList actions={model.nextBestActions} />
         </section>
       ) : null}
@@ -240,7 +250,7 @@ export default function ApplicationCommandCenterPage() {
       {(filter === "applications" || filter === "today") ? (
         <PipelineSnapshot model={model} decisions={decisions} pendingJobId={pendingJobId} onDecision={updateDecision} />
       ) : null}
-      {filter === "watchlist" ? <TaskSection title="Company Watch Snapshot" tasks={model.watchlistTasks} empty="No companies watched yet." actionHref="/companies/watchlist" /> : null}
+      {filter === "watchlist" ? <TaskSection title="Company Watch Snapshot" tasks={model.watchlistTasks} empty="No companies watched yet." actionHref={APP_ROUTES.companyWatchlist} /> : null}
       {filter === "discovery" ? <DiscoveryHealth model={model} /> : null}
     </>
   );
@@ -417,7 +427,7 @@ function DailyOperatingLoopSummary({ model }: { model: DailyOperatingLoopModel }
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={copySummary} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-white">Copy Summary</button>
           <button type="button" onClick={downloadSummary} className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">Download Markdown Summary</button>
-          <Link href="/applications/analytics" className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-white">Open Analytics</Link>
+          <Link href={APP_ROUTES.analytics} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-white">Open Analytics</Link>
         </div>
       </div>
       {copyMessage ? <p className="mt-3 text-sm text-[#175cd3]">{copyMessage}</p> : null}
@@ -441,7 +451,7 @@ function JobsToReviewSection({
   const unreviewed = jobs.filter((job) => !decisionIds.has(job.job_id)).slice(0, 8);
   return (
     <section id="jobs-to-review" className="mb-5 rounded-md border border-[#d9dee8] bg-white p-5">
-      <SectionHeader title="Jobs to Review" href="/recommendations" />
+      <SectionHeader title="Jobs to Review" href={APP_ROUTES.recommendedJobs} />
       {!unreviewed.length ? <Empty text="No saved-job review tasks. Review recommendations or run Daily Scout." /> : (
         <div className="grid gap-3">
           {unreviewed.map((job) => (
@@ -484,13 +494,13 @@ function TaskSection({ id, title, tasks, empty, actionHref }: { id?: string; tit
 
 function ColdDmSection({ tasks }: { tasks: CommandCenterTask[] }) {
   return (
-    <TaskSection id="cold-dm-tasks" title="Cold DM Tasks" tasks={tasks} empty="No cold DM tasks right now." actionHref="/applications/follow-ups" />
+    <TaskSection id="cold-dm-tasks" title="Cold DM Tasks" tasks={tasks} empty="No cold DM tasks right now." actionHref={APP_ROUTES.followUps} />
   );
 }
 
 function FollowUpSection({ tasks }: { tasks: CommandCenterTask[] }) {
   return (
-    <TaskSection id="follow-ups" title="Follow-ups" tasks={tasks} empty="No follow-ups tracked yet." actionHref="/applications/follow-ups" />
+    <TaskSection id="follow-ups" title="Follow-ups" tasks={tasks} empty="No follow-ups tracked yet." actionHref={APP_ROUTES.followUps} />
   );
 }
 
@@ -508,7 +518,7 @@ function PipelineSnapshot({
   const top = decisions.filter((decision) => ["applied", "interviewing", "needs_custom_resume", "needs_cold_dm"].includes(decision.decision_status ?? decision.status ?? "saved")).slice(0, 8);
   return (
     <section className="mb-5 rounded-md border border-[#d9dee8] bg-white p-5">
-      <SectionHeader title="Application Pipeline Snapshot" href="/jobs/pipeline" />
+      <SectionHeader title="Application Pipeline Snapshot" href={APP_ROUTES.pipeline} />
       <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {Object.entries(model.pipelineCounts).map(([status, count]) => <Metric key={status} label={labelize(status)} value={count} />)}
       </div>
@@ -541,7 +551,7 @@ function DiscoveryHealth({ model }: { model: ApplicationCommandCenterModel }) {
   const run = model.latestDiscoveryRun;
   return (
     <section className="mb-5 rounded-md border border-[#d9dee8] bg-white p-5">
-      <SectionHeader title="Discovery Health" href="/discovery/control-center" />
+      <SectionHeader title="Discovery Health" href={APP_ROUTES.discovery} />
       <div className="grid gap-3 md:grid-cols-3">
         <Fact label="Latest run" value={run ? formatDate(run.finished_at ?? run.started_at) : "No run found"} />
         <Fact label="Latest source" value={String(run?.source ?? "Unknown")} />
@@ -551,9 +561,9 @@ function DiscoveryHealth({ model }: { model: ApplicationCommandCenterModel }) {
         <Fact label="Jobs enriched" value={String(run?.jobs_enriched ?? 0)} />
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
-        <Link href="/discovery/control-center" className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">Open Discovery Control Center</Link>
-        <Link href="/discovery/control-center#run-presets" className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Open Run Presets</Link>
-        <Link href="/discovery/control-center" className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Compare Runs</Link>
+        <Link href={APP_ROUTES.discovery} className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">Open Discovery Control Center</Link>
+        <Link href={`${APP_ROUTES.discovery}#run-presets`} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Open Run Presets</Link>
+        <Link href={APP_ROUTES.discovery} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Compare Runs</Link>
       </div>
     </section>
   );

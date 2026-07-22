@@ -57,6 +57,7 @@ import {
   type DiscoveryRunPreset,
 } from "@/lib/discovery-presets";
 import { buildDailyScoutPayload, safeDefaultDailySources } from "@/lib/daily-scout";
+import { APP_ROUTES } from "@/lib/app-routes";
 import { buildSourceQualityAdvisor } from "@/lib/source-quality-advisor";
 import { watchCompanyFromJob } from "@/lib/company-watchlist-api";
 import {
@@ -679,19 +680,19 @@ export default function DiscoveryControlCenterPage() {
         description="Run startup/job sources and inspect what was fetched, enriched, ingested, scored, rejected, or skipped."
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link href="/recommendations" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
+            <Link href={APP_ROUTES.recommendedJobs} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
               Recommended Jobs
             </Link>
-            <Link href="/jobs/pipeline" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
+            <Link href={APP_ROUTES.pipeline} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
               Pipeline
             </Link>
-            <Link href="/applications/command-center" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
+            <Link href={APP_ROUTES.commandCenter} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
               Command Center
             </Link>
-            <Link href="/applications/analytics" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
+            <Link href={APP_ROUTES.analytics} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
               Analytics
             </Link>
-            <Link href="/applications/follow-ups" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
+            <Link href={APP_ROUTES.followUps} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
               Follow-ups
             </Link>
           </div>
@@ -702,6 +703,9 @@ export default function DiscoveryControlCenterPage() {
         <Notice tone="warning">
           Discovery plan unavailable. The backend may be offline, but you can still prepare a run payload.
         </Notice>
+      ) : null}
+      {planQuery.isLoading || runsQuery.isLoading ? (
+        <Notice>Loading discovery sources and recent runs...</Notice>
       ) : null}
 
       <DailyScoutPanel
@@ -1056,11 +1060,13 @@ function WarningsPanel({ warnings }: { warnings: string[] }) {
   );
 }
 
-function Notice({ tone, children }: { tone: "warning" | "danger"; children: ReactNode }) {
+function Notice({ tone = "default", children }: { tone?: "default" | "warning" | "danger"; children: ReactNode }) {
   const classes =
     tone === "danger"
       ? "border-[#fecaca] bg-[#fff7f7] text-[#991b1b]"
-      : "border-[#fedf89] bg-[#fffbeb] text-[#92400e]";
+      : tone === "warning"
+        ? "border-[#fedf89] bg-[#fffbeb] text-[#92400e]"
+        : "border-[#d9dee8] bg-white text-[#344054]";
   return <div className={`mb-5 rounded-md border p-4 text-sm ${classes}`}>{children}</div>;
 }
 

@@ -8,6 +8,7 @@ import { RecommendedJobCard } from "@/components/recommendations/RecommendedJobC
 import { RecommendationFilters } from "@/components/recommendations/RecommendationFilters";
 import { generateApplicationPacketForJob } from "@/lib/application-packet-api";
 import { generateApplicationPrepForJob } from "@/lib/application-prep-api";
+import { APP_ROUTES } from "@/lib/app-routes";
 import { generateResumeImprovementForJob } from "@/lib/resume-improvements-api";
 import { useRecommendedJobMatches } from "@/hooks/use-job-matches";
 import { useActiveResume } from "@/hooks/use-resumes";
@@ -226,19 +227,31 @@ export default function RecommendationsPage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <Link
-              href="/companies/watchlist"
+              href={APP_ROUTES.companyWatchlist}
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
               Company Watchlist
             </Link>
             <Link
-              href="/jobs/pipeline"
+              href={APP_ROUTES.commandCenter}
+              className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
+            >
+              Command Center
+            </Link>
+            <Link
+              href={APP_ROUTES.pipeline}
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
               Application Pipeline
             </Link>
             <Link
-              href="/discovery/control-center"
+              href={APP_ROUTES.analytics}
+              className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
+            >
+              Analytics
+            </Link>
+            <Link
+              href={APP_ROUTES.discovery}
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
               Discovery Control
@@ -377,7 +390,7 @@ function ResumeStatusBanner({
           </p>
         </div>
         <Link
-          href="/profile/resume"
+          href={APP_ROUTES.resume}
           className="rounded border border-[#166534] bg-white px-3 py-2 text-sm font-medium text-[#166534] hover:bg-[#f0fdf4]"
         >
           Manage Resume
@@ -396,7 +409,7 @@ function ResumeStatusBanner({
         </p>
       </div>
       <Link
-        href="/profile/resume"
+        href={APP_ROUTES.resume}
         className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]"
       >
         Upload Resume

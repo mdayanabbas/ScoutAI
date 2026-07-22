@@ -5,6 +5,7 @@ import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { PageHeader } from "@/components/layout/PageHeader";
+import { APP_ROUTES } from "@/lib/app-routes";
 import {
   archiveCompanyWatchlistItem,
   createCompanyWatchlistItem,
@@ -126,16 +127,19 @@ export default function CompanyWatchlistPage() {
         description="Track startups you like and review new opportunities from them."
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link href="/recommendations" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
+            <Link href={APP_ROUTES.recommendedJobs} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
               Recommended Jobs
             </Link>
-            <Link href="/discovery/control-center" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
+            <Link href={APP_ROUTES.discovery} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
               Discovery Control
             </Link>
-            <Link href="/applications/command-center" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
+            <Link href={APP_ROUTES.commandCenter} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
               Command Center
             </Link>
-            <Link href="/jobs/pipeline" className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">
+            <Link href={APP_ROUTES.analytics} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
+              Analytics
+            </Link>
+            <Link href={APP_ROUTES.pipeline} className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">
               Application Pipeline
             </Link>
           </div>
