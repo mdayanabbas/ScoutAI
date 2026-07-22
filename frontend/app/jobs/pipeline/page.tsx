@@ -16,6 +16,7 @@ import {
 } from "@/components/recommendations/recommendation-format";
 import { useJobDecisions, useJobDecisionStatusCounts } from "@/hooks/use-job-decisions";
 import { buildApplicationPipelineAnalytics } from "@/lib/application-pipeline-analytics";
+import { APP_ROUTES } from "@/lib/app-routes";
 import { archiveJobDecision, updateJobDecision } from "@/lib/job-decisions-api";
 import type {
   JobDecisionListItem,
@@ -166,7 +167,7 @@ export default function ApplicationPipelinePage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <Link
-              href="/companies/watchlist"
+              href={APP_ROUTES.companyWatchlist}
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
               Company Watchlist
@@ -178,37 +179,37 @@ export default function ApplicationPipelinePage() {
               Pipeline Analytics
             </Link>
             <Link
-              href="/applications/analytics"
+              href={APP_ROUTES.analytics}
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
               Job Search Analytics
             </Link>
             <Link
-              href="/jobs/tracked"
+              href={APP_ROUTES.trackedJobs}
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
               Tracked Jobs
             </Link>
             <Link
-              href="/discovery/control-center"
+              href={APP_ROUTES.discovery}
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
               Discovery Control
             </Link>
             <Link
-              href="/applications/command-center"
+              href={APP_ROUTES.commandCenter}
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
               Command Center
             </Link>
             <Link
-              href="/applications/follow-ups"
+              href={APP_ROUTES.followUps}
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
               Follow-ups
             </Link>
             <Link
-              href="/recommendations"
+              href={APP_ROUTES.recommendedJobs}
               className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]"
             >
               Recommended Jobs
@@ -287,7 +288,7 @@ export default function ApplicationPipelinePage() {
       {!decisionsQuery.isLoading && !decisionsQuery.error && decisions.length === 0 ? (
         <div className="rounded-md border border-dashed border-[#c8ced8] bg-white p-8 text-center">
           <h2 className="text-base font-semibold text-[#171923]">No tracked jobs yet.</h2>
-          <Link href="/recommendations" className="mt-3 inline-block rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white">
+          <Link href={APP_ROUTES.recommendedJobs} className="mt-3 inline-block rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white">
             Go to Recommended Jobs
           </Link>
         </div>

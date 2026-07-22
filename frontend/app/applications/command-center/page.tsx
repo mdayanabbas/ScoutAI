@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { PageHeader } from "@/components/layout/PageHeader";
+import { LoadingState } from "@/components/ui/AppState";
 import { applicationFollowUpStorage } from "@/lib/application-follow-ups";
+import { APP_ROUTES } from "@/lib/app-routes";
 import {
   buildApplicationCommandCenterModel,
   type ApplicationCommandCenterModel,
@@ -51,6 +53,7 @@ export default function ApplicationCommandCenterPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingJobId, setPendingJobId] = useState<string | null>(null);
+  const [demoMode, setDemoMode] = useState(false);
   const today = localDateKey();
   const [loopState, setLoopState] = useState<DailyOperatingLoopState | null>(() => dailyOperatingLoopStorage.getTodayLoop(today));
   const [summaryOpen, setSummaryOpen] = useState(false);
@@ -88,7 +91,35 @@ export default function ApplicationCommandCenterPage() {
     watchlistQuery.error ? "Company watchlist unavailable." : null,
     discoveryRunsQuery.error ? "Discovery runs unavailable." : null,
   ].filter(Boolean) as string[];
+  const loadingSections =
+    decisionsQuery.isLoading ||
+    recommendedQuery.isLoading ||
+    resumeQuery.isLoading ||
+    watchlistQuery.isLoading ||
+    discoveryRunsQuery.isLoading;
   const loopModel = useMemo(() => buildDailyOperatingLoopModel(model, loopState, new Date()), [loopState, model]);
+  const readinessChecks = useMemo(
+    () =>
+      buildDemoReadinessChecks({
+        activeResume: Boolean(resumeQuery.data),
+        recentDiscoveryRun: Boolean(model.latestDiscoveryRun),
+        recommendedJobs: (recommendedQuery.data?.items ?? []).length,
+        savedOrInterestedJobs: decisions.filter((decision) => ["saved", "interested", "needs_custom_resume", "needs_cold_dm", "applied", "interviewing"].includes(decision.decision_status ?? decision.status ?? "")).length,
+        followUps: localFollowUps.length,
+        analyticsData: decisions.length + localFollowUps.length + coldDrafts.length + (discoveryRunsQuery.data?.items?.length ?? 0),
+        watchedCompanies: Number(watchlistStatsQuery.data?.total ?? watchlistQuery.data?.items?.length ?? 0),
+      }),
+    [coldDrafts.length, decisions, discoveryRunsQuery.data?.items?.length, localFollowUps.length, model.latestDiscoveryRun, recommendedQuery.data?.items, resumeQuery.data, watchlistQuery.data?.items?.length, watchlistStatsQuery.data?.total],
+  );
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      setDemoMode(params.get("demo") === "1" || window.localStorage.getItem("scoutai.demoMode.enabled") === "true");
+    } catch {
+      setDemoMode(false);
+    }
+  }, []);
 
   function refreshLoop(note?: string) {
     setLoopState(dailyOperatingLoopStorage.getTodayLoop(today));
@@ -182,14 +213,17 @@ export default function ApplicationCommandCenterPage() {
         description="Your daily job-search control room for reviews, follow-ups, resume tasks, outreach, and applications."
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link href="/discovery/control-center" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Discovery Control</Link>
-            <Link href="/applications/analytics" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Analytics</Link>
-            <Link href="/applications/follow-ups" className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Follow-ups</Link>
-            <Link href="/jobs/pipeline" className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">Pipeline</Link>
+            <Link href={APP_ROUTES.discovery} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Discovery Control</Link>
+            <Link href={APP_ROUTES.analytics} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Analytics</Link>
+            <Link href={APP_ROUTES.followUps} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Follow-ups</Link>
+            <Link href={APP_ROUTES.companyWatchlist} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Watchlist</Link>
+            <Link href={APP_ROUTES.pipeline} className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">Pipeline</Link>
           </div>
         }
       />
 
+      {loadingSections ? <div className="mb-4"><LoadingState message="Loading your job-search command center..." /></div> : null}
+      {demoMode ? <DemoModeBadge /> : null}
       {message ? <Notice>{message}</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       {queryErrors.length ? <Notice tone="warning">{`Partial dashboard: ${queryErrors.join(" ")}`}</Notice> : null}
@@ -209,18 +243,20 @@ export default function ApplicationCommandCenterPage() {
       />
 
       <SummaryGrid model={model} />
+      <DemoReadinessPanel checks={readinessChecks} />
+      <DemoShortcuts />
       <FilterTabs active={filter} onChange={setFilter} />
 
       {(filter === "today" || filter === "needs_action") ? (
         <section className="mb-5 rounded-md border border-[#d9dee8] bg-white p-5">
-          <SectionHeader title="Today's Priorities" href="/applications/follow-ups" />
+          <SectionHeader title="Today's Priorities" href={APP_ROUTES.followUps} />
           <ActionList actions={model.todayPriorities} />
         </section>
       ) : null}
 
       {(filter === "today" || filter === "needs_action") ? (
         <section className="mb-5 rounded-md border border-[#d9dee8] bg-white p-5">
-          <SectionHeader title="Next Best Actions" href="/discovery/control-center" />
+          <SectionHeader title="Next Best Actions" href={APP_ROUTES.discovery} />
           <ActionList actions={model.nextBestActions} />
         </section>
       ) : null}
@@ -240,7 +276,7 @@ export default function ApplicationCommandCenterPage() {
       {(filter === "applications" || filter === "today") ? (
         <PipelineSnapshot model={model} decisions={decisions} pendingJobId={pendingJobId} onDecision={updateDecision} />
       ) : null}
-      {filter === "watchlist" ? <TaskSection title="Company Watch Snapshot" tasks={model.watchlistTasks} empty="No companies watched yet." actionHref="/companies/watchlist" /> : null}
+      {filter === "watchlist" ? <TaskSection title="Company Watch Snapshot" tasks={model.watchlistTasks} empty="No companies watched yet." actionHref={APP_ROUTES.companyWatchlist} /> : null}
       {filter === "discovery" ? <DiscoveryHealth model={model} /> : null}
     </>
   );
@@ -261,6 +297,85 @@ function SummaryGrid({ model }: { model: ApplicationCommandCenterModel }) {
         <p className="mt-1 text-sm font-semibold text-[#171923]">{model.summary.activeResume}</p>
       </div>
     </section>
+  );
+}
+
+type DemoReadinessCheck = {
+  id: string;
+  label: string;
+  passed: boolean;
+  detail: string;
+  href: string;
+  action: string;
+};
+
+function DemoReadinessPanel({ checks }: { checks: DemoReadinessCheck[] }) {
+  const passed = checks.filter((check) => check.passed).length;
+  return (
+    <section className="mb-5 rounded-md border border-[#d9dee8] bg-white p-5">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-[#171923]">Demo Readiness</h2>
+          <p className="mt-1 text-sm text-[#667085]">
+            {passed} of {checks.length} checks ready for a smooth portfolio walkthrough.
+          </p>
+        </div>
+        <Link href={APP_ROUTES.discovery} className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">
+          Start Demo Flow
+        </Link>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {checks.map((check) => (
+          <article key={check.id} className={`rounded border p-3 ${check.passed ? "border-[#bbf7d0] bg-[#f0fdf4]" : "border-[#fed7aa] bg-[#fff7ed]"}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-[#171923]">{check.label}</p>
+                <p className="mt-1 text-sm text-[#667085]">{check.detail}</p>
+              </div>
+              <span className={`rounded border px-2 py-1 text-xs font-medium ${check.passed ? "border-[#bbf7d0] bg-white text-[#166534]" : "border-[#fed7aa] bg-white text-[#9a3412]"}`}>
+                {check.passed ? "Ready" : "Needs setup"}
+              </span>
+            </div>
+            <Link href={check.href} className="mt-3 inline-block text-sm font-medium text-[#175cd3]">{check.action}</Link>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function DemoShortcuts() {
+  const shortcuts = [
+    { label: "Run Discovery", href: APP_ROUTES.discovery },
+    { label: "Review Queue", href: `${APP_ROUTES.discovery}#review-queue` },
+    { label: "Pipeline", href: APP_ROUTES.pipeline },
+    { label: "Follow-ups", href: APP_ROUTES.followUps },
+    { label: "Analytics", href: APP_ROUTES.analytics },
+    { label: "Watchlist", href: APP_ROUTES.companyWatchlist },
+    { label: "Resume", href: APP_ROUTES.resume },
+  ];
+  return (
+    <section className="mb-5 rounded-md border border-[#d9dee8] bg-white p-5">
+      <div className="mb-4">
+        <h2 className="text-base font-semibold text-[#171923]">Demo Shortcuts</h2>
+        <p className="mt-1 text-sm text-[#667085]">Use this route order: Command Center, Discovery, Review Queue, Action Center, Resume Fit, Export Pack, Cold DM, Follow-ups, Pipeline, Watchlist, Analytics.</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {shortcuts.map((shortcut) => (
+          <Link key={shortcut.href} href={shortcut.href} className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">
+            {shortcut.label}
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function DemoModeBadge() {
+  return (
+    <div className="mb-4 rounded-md border border-[#bfdbfe] bg-[#eff6ff] px-4 py-3 text-sm text-[#1d4ed8]">
+      Demo Mode is on. ScoutAI will show guidance, but it will not fake API success or overwrite backend data.
+    </div>
   );
 }
 
@@ -417,7 +532,7 @@ function DailyOperatingLoopSummary({ model }: { model: DailyOperatingLoopModel }
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={copySummary} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-white">Copy Summary</button>
           <button type="button" onClick={downloadSummary} className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">Download Markdown Summary</button>
-          <Link href="/applications/analytics" className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-white">Open Analytics</Link>
+          <Link href={APP_ROUTES.analytics} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-white">Open Analytics</Link>
         </div>
       </div>
       {copyMessage ? <p className="mt-3 text-sm text-[#175cd3]">{copyMessage}</p> : null}
@@ -441,7 +556,7 @@ function JobsToReviewSection({
   const unreviewed = jobs.filter((job) => !decisionIds.has(job.job_id)).slice(0, 8);
   return (
     <section id="jobs-to-review" className="mb-5 rounded-md border border-[#d9dee8] bg-white p-5">
-      <SectionHeader title="Jobs to Review" href="/recommendations" />
+      <SectionHeader title="Jobs to Review" href={APP_ROUTES.recommendedJobs} />
       {!unreviewed.length ? <Empty text="No saved-job review tasks. Review recommendations or run Daily Scout." /> : (
         <div className="grid gap-3">
           {unreviewed.map((job) => (
@@ -484,13 +599,13 @@ function TaskSection({ id, title, tasks, empty, actionHref }: { id?: string; tit
 
 function ColdDmSection({ tasks }: { tasks: CommandCenterTask[] }) {
   return (
-    <TaskSection id="cold-dm-tasks" title="Cold DM Tasks" tasks={tasks} empty="No cold DM tasks right now." actionHref="/applications/follow-ups" />
+    <TaskSection id="cold-dm-tasks" title="Cold DM Tasks" tasks={tasks} empty="No cold DM tasks right now." actionHref={APP_ROUTES.followUps} />
   );
 }
 
 function FollowUpSection({ tasks }: { tasks: CommandCenterTask[] }) {
   return (
-    <TaskSection id="follow-ups" title="Follow-ups" tasks={tasks} empty="No follow-ups tracked yet." actionHref="/applications/follow-ups" />
+    <TaskSection id="follow-ups" title="Follow-ups" tasks={tasks} empty="No follow-ups tracked yet." actionHref={APP_ROUTES.followUps} />
   );
 }
 
@@ -508,7 +623,7 @@ function PipelineSnapshot({
   const top = decisions.filter((decision) => ["applied", "interviewing", "needs_custom_resume", "needs_cold_dm"].includes(decision.decision_status ?? decision.status ?? "saved")).slice(0, 8);
   return (
     <section className="mb-5 rounded-md border border-[#d9dee8] bg-white p-5">
-      <SectionHeader title="Application Pipeline Snapshot" href="/jobs/pipeline" />
+      <SectionHeader title="Application Pipeline Snapshot" href={APP_ROUTES.pipeline} />
       <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {Object.entries(model.pipelineCounts).map(([status, count]) => <Metric key={status} label={labelize(status)} value={count} />)}
       </div>
@@ -541,7 +656,7 @@ function DiscoveryHealth({ model }: { model: ApplicationCommandCenterModel }) {
   const run = model.latestDiscoveryRun;
   return (
     <section className="mb-5 rounded-md border border-[#d9dee8] bg-white p-5">
-      <SectionHeader title="Discovery Health" href="/discovery/control-center" />
+      <SectionHeader title="Discovery Health" href={APP_ROUTES.discovery} />
       <div className="grid gap-3 md:grid-cols-3">
         <Fact label="Latest run" value={run ? formatDate(run.finished_at ?? run.started_at) : "No run found"} />
         <Fact label="Latest source" value={String(run?.source ?? "Unknown")} />
@@ -551,9 +666,9 @@ function DiscoveryHealth({ model }: { model: ApplicationCommandCenterModel }) {
         <Fact label="Jobs enriched" value={String(run?.jobs_enriched ?? 0)} />
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
-        <Link href="/discovery/control-center" className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">Open Discovery Control Center</Link>
-        <Link href="/discovery/control-center#run-presets" className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Open Run Presets</Link>
-        <Link href="/discovery/control-center" className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Compare Runs</Link>
+        <Link href={APP_ROUTES.discovery} className="rounded bg-[#172033] px-3 py-2 text-sm font-medium text-white hover:bg-[#0f1728]">Open Discovery Control Center</Link>
+        <Link href={`${APP_ROUTES.discovery}#run-presets`} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Open Run Presets</Link>
+        <Link href={APP_ROUTES.discovery} className="rounded border border-[#c8ced8] px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]">Compare Runs</Link>
       </div>
     </section>
   );
@@ -654,4 +769,73 @@ function formatDate(value?: string | null) {
   if (!value) return "Not available";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "Invalid date" : date.toLocaleString();
+}
+
+function buildDemoReadinessChecks(input: {
+  activeResume: boolean;
+  recentDiscoveryRun: boolean;
+  recommendedJobs: number;
+  savedOrInterestedJobs: number;
+  followUps: number;
+  analyticsData: number;
+  watchedCompanies: number;
+}): DemoReadinessCheck[] {
+  return [
+    {
+      id: "active-resume",
+      label: "Active resume",
+      passed: input.activeResume,
+      detail: input.activeResume ? "Resume-aware ranking can be demonstrated." : "Upload or activate a resume before the demo.",
+      href: APP_ROUTES.resume,
+      action: "Open Resume",
+    },
+    {
+      id: "recent-discovery",
+      label: "Discovery run",
+      passed: input.recentDiscoveryRun,
+      detail: input.recentDiscoveryRun ? "A discovery run is available for diagnostics." : "Run Daily Scout or a reliable remote preset.",
+      href: APP_ROUTES.discovery,
+      action: "Open Discovery",
+    },
+    {
+      id: "recommended-jobs",
+      label: "Recommended jobs",
+      passed: input.recommendedJobs >= 3,
+      detail: input.recommendedJobs >= 3 ? `${input.recommendedJobs} recommendations loaded.` : "Aim for at least 3 visible recommendations.",
+      href: APP_ROUTES.recommendedJobs,
+      action: "Open Recommendations",
+    },
+    {
+      id: "pipeline",
+      label: "Pipeline activity",
+      passed: input.savedOrInterestedJobs > 0,
+      detail: input.savedOrInterestedJobs > 0 ? `${input.savedOrInterestedJobs} tracked jobs are ready to show.` : "Save or mark at least one job as interested.",
+      href: APP_ROUTES.pipeline,
+      action: "Open Pipeline",
+    },
+    {
+      id: "follow-ups",
+      label: "Follow-up tracker",
+      passed: input.followUps > 0,
+      detail: input.followUps > 0 ? `${input.followUps} follow-up items are tracked.` : "Track a copied or manually sent cold DM.",
+      href: APP_ROUTES.followUps,
+      action: "Open Follow-ups",
+    },
+    {
+      id: "watchlist",
+      label: "Company watchlist",
+      passed: input.watchedCompanies > 0,
+      detail: input.watchedCompanies > 0 ? `${input.watchedCompanies} watched companies available.` : "Watch at least one company from a job card.",
+      href: APP_ROUTES.companyWatchlist,
+      action: "Open Watchlist",
+    },
+    {
+      id: "analytics",
+      label: "Analytics data",
+      passed: input.analyticsData > 0,
+      detail: input.analyticsData > 0 ? "Analytics has real workflow data." : "Save, apply, draft, track, or run discovery first.",
+      href: APP_ROUTES.analytics,
+      action: "Open Analytics",
+    },
+  ];
 }

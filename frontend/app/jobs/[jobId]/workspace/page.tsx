@@ -28,6 +28,7 @@ import {
   copyApplicationPackMarkdown,
   downloadMarkdownFile,
 } from "@/lib/application-export-pack";
+import { APP_ROUTES } from "@/lib/app-routes";
 import { generateApplicationPacketForDecision, generateApplicationPacketForJob } from "@/lib/application-packet-api";
 import { generateApplicationPrepForDecision, generateApplicationPrepForJob } from "@/lib/application-prep-api";
 import { getJobDecision, listJobDecisions, saveJobDecision, updateJobDecision } from "@/lib/job-decisions-api";
@@ -245,31 +246,31 @@ export default function JobWorkspacePage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <Link
-              href="/companies/watchlist"
+              href={APP_ROUTES.companyWatchlist}
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
               Company Watchlist
             </Link>
             <Link
-              href="/jobs/pipeline"
+              href={APP_ROUTES.pipeline}
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
               Application Pipeline
             </Link>
             <Link
-              href="/applications/command-center"
+              href={APP_ROUTES.commandCenter}
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
               Command Center
             </Link>
             <Link
-              href="/discovery/control-center"
+              href={APP_ROUTES.discovery}
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
               Discovery Control
             </Link>
             <Link
-              href="/applications/follow-ups"
+              href={APP_ROUTES.followUps}
               className="rounded border border-[#c8ced8] bg-white px-3 py-2 text-sm font-medium text-[#344054] hover:bg-[#f8fafc]"
             >
               Follow-ups
